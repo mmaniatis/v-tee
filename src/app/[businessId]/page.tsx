@@ -1,43 +1,52 @@
-'use client'
+'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Business } from '@/types/business';
-import { getBusinessById } from '@/lib/mockData';
+import { getBusinessById } from "@/lib/mockData";
+import type { Business } from "@/types/business";
+
+const formatTime = (time: string): string => {
+  const [hours] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:00 ${period}`;
+};
 
 const generateTimeSlots = (start: string, end: string) => {
-    const slots = [];
-    const [startHour] = start.split(':').map(Number);
-    let [endHour] = end.split(':').map(Number);
-    
-    // Adjust for midnight
-    if (endHour === 0) {
-      endHour = 24;
-    }
-    
-    for (let hour = startHour; hour < endHour; hour++) {
-      const displayHour = hour % 24; // Handle hours after midnight
-      slots.push(`${displayHour.toString().padStart(2, '0')}:00`);
-    }
-    return slots;
-  };
+  const slots = [];
+  const [startHour] = start.split(':').map(Number);
+  let [endHour] = end.split(':').map(Number);
+  
+  if (endHour === 0) {
+    endHour = 24;
+  }
+  
+  for (let hour = startHour; hour < endHour; hour++) {
+    const displayHour = hour % 24;
+    const time = `${displayHour.toString().padStart(2, '0')}:00`;
+    slots.push({
+      value: time,
+      display: formatTime(time)
+    });
+  }
+  return slots;
+};
 
-const BookingPage = () => {
-  const params = useParams();
+export default function BookingPage({ params }: { params: Promise<{ businessId: string }> }) {
+  const resolvedParams = React.use(params);
   const [business, setBusiness] = useState<Business | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   
   useEffect(() => {
-    const businessId = Number(params?.businessId);
+    const businessId = Number(resolvedParams.businessId);
     const businessData = getBusinessById(businessId);
     if (businessData) {
       setBusiness(businessData);
     }
-  }, [params?.businessId]);
+  }, [resolvedParams.businessId]);
 
   if (!business) {
     return (
@@ -47,6 +56,7 @@ const BookingPage = () => {
     );
   }
 
+  // Rest of the component remains the same
   const isWeekend = (date: Date) => {
     const day = date.getDay();
     return day === 0 || day === 6;
@@ -85,11 +95,13 @@ const BookingPage = () => {
             <CardTitle>{business.name}</CardTitle>
             <p className="text-gray-500">{business.location}</p>
             <p className="text-gray-600 mt-2">{business.description}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              All times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </p>
           </CardHeader>
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Calendar Section */}
           <Card>
             <CardHeader>
               <CardTitle>Select Date</CardTitle>
@@ -101,7 +113,7 @@ const BookingPage = () => {
                 onSelect={(date) => {
                   if (date) {
                     setSelectedDate(date);
-                    setSelectedTime(null); // Reset time when date changes
+                    setSelectedTime(null);
                   }
                 }}
                 className="rounded-md border"
@@ -109,7 +121,6 @@ const BookingPage = () => {
             </CardContent>
           </Card>
 
-          {/* Time Slots Section */}
           <Card>
             <CardHeader>
               <CardTitle>Available Times</CardTitle>
@@ -120,14 +131,14 @@ const BookingPage = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-2">
-                {timeSlots.map((time) => (
+                {timeSlots.map((slot) => (
                   <Button
-                    key={time}
-                    variant={selectedTime === time ? "default" : "outline"}
-                    onClick={() => setSelectedTime(time)}
+                    key={slot.value}
+                    variant={selectedTime === slot.value ? "default" : "outline"}
+                    onClick={() => setSelectedTime(slot.value)}
                     className="w-full"
                   >
-                    {time} (${getPrice(time)})
+                    {slot.display} (${getPrice(slot.value)})
                   </Button>
                 ))}
               </div>
@@ -142,7 +153,7 @@ const BookingPage = () => {
                 <div>
                   <h3 className="text-lg font-semibold">Selected Booking</h3>
                   <p className="text-gray-500">
-                    {selectedDate.toLocaleDateString()} at {selectedTime}
+                    {selectedDate.toLocaleDateString()} at {formatTime(selectedTime)}
                   </p>
                   <p className="text-gray-500">
                     Price: ${getPrice(selectedTime)}
@@ -158,6 +169,4 @@ const BookingPage = () => {
       </div>
     </div>
   );
-};
-
-export default BookingPage;
+}

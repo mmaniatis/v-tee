@@ -42,14 +42,14 @@ const AdminPage = () => {
   const updateSettings = (path: string[], value: any) => {
     setSettings(prevSettings => {
       if (!prevSettings) return null;
-      
+
       const newSettings = JSON.parse(JSON.stringify(prevSettings));
       let current = newSettings;
-      
+
       for (let i = 0; i < path.length - 1; i++) {
         current = current[path[i]];
       }
-      
+
       current[path[path.length - 1]] = value;
       setHasChanges(true);
       return newSettings;
@@ -68,7 +68,7 @@ const AdminPage = () => {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Business Settings - {business.name}</h1>
           {hasChanges && (
-            <Button 
+            <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={handleSave}
             >
@@ -76,7 +76,7 @@ const AdminPage = () => {
             </Button>
           )}
         </div>
-        
+
         <Tabs defaultValue="hours">
           <TabsList className="mb-4">
             <TabsTrigger value="hours">Hours</TabsTrigger>
@@ -96,16 +96,16 @@ const AdminPage = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm mb-1">Open</label>
-                        <Input 
-                          type="time" 
+                        <Input
+                          type="time"
                           value={settings.hours.weekday.open}
                           onChange={(e) => updateSettings(['hours', 'weekday', 'open'], e.target.value)}
                         />
                       </div>
                       <div>
                         <label className="block text-sm mb-1">Close</label>
-                        <Input 
-                          type="time" 
+                        <Input
+                          type="time"
                           value={settings.hours.weekday.close}
                           onChange={(e) => updateSettings(['hours', 'weekday', 'close'], e.target.value)}
                         />
@@ -118,16 +118,16 @@ const AdminPage = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm mb-1">Open</label>
-                        <Input 
-                          type="time" 
+                        <Input
+                          type="time"
                           value={settings.hours.weekend.open}
                           onChange={(e) => updateSettings(['hours', 'weekend', 'open'], e.target.value)}
                         />
                       </div>
                       <div>
                         <label className="block text-sm mb-1">Close</label>
-                        <Input 
-                          type="time" 
+                        <Input
+                          type="time"
                           value={settings.hours.weekend.close}
                           onChange={(e) => updateSettings(['hours', 'weekend', 'close'], e.target.value)}
                         />
@@ -149,20 +149,20 @@ const AdminPage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm mb-1">Weekday Rate</label>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         value={settings.pricing.weekday}
                         onChange={(e) => updateSettings(['pricing', 'weekday'], Number(e.target.value))}
-                        prefix="$" 
+                        prefix="$"
                       />
                     </div>
                     <div>
                       <label className="block text-sm mb-1">Weekend Rate</label>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         value={settings.pricing.weekend}
                         onChange={(e) => updateSettings(['pricing', 'weekend'], Number(e.target.value))}
-                        prefix="$" 
+                        prefix="$"
                       />
                     </div>
                   </div>
@@ -172,27 +172,27 @@ const AdminPage = () => {
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm mb-1">Start Time</label>
-                        <Input 
-                          type="time" 
+                        <Input
+                          type="time"
                           value={settings.pricing.peakHours.start}
                           onChange={(e) => updateSettings(['pricing', 'peakHours', 'start'], e.target.value)}
                         />
                       </div>
                       <div>
                         <label className="block text-sm mb-1">End Time</label>
-                        <Input 
-                          type="time" 
+                        <Input
+                          type="time"
                           value={settings.pricing.peakHours.end}
                           onChange={(e) => updateSettings(['pricing', 'peakHours', 'end'], e.target.value)}
                         />
                       </div>
                       <div>
                         <label className="block text-sm mb-1">Additional Cost</label>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           value={settings.pricing.peakHours.additionalCost}
                           onChange={(e) => updateSettings(['pricing', 'peakHours', 'additionalCost'], Number(e.target.value))}
-                          prefix="$" 
+                          prefix="$"
                         />
                       </div>
                     </div>
@@ -203,11 +203,41 @@ const AdminPage = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm mb-1">Solo Golfer Discount</label>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           value={settings.pricing.solo.discount}
                           onChange={(e) => updateSettings(['pricing', 'solo', 'discount'], Number(e.target.value))}
-                          suffix="%" 
+                          suffix="%"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold mb-4">Duration Settings</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm mb-1">Minimum Duration (mins)</label>
+                        <Input
+                          type="number"
+                          value={settings.durationConfig.minDuration}
+                          onChange={(e) => updateSettings(['durationConfig', 'minDuration'], Number(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Maximum Duration (mins)</label>
+                        <Input
+                          type="number"
+                          value={settings.durationConfig.maxDuration}
+                          onChange={(e) => updateSettings(['durationConfig', 'maxDuration'], Number(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Interval (mins)</label>
+                        <Input
+                          type="number"
+                          value={settings.durationConfig.interval}
+                          onChange={(e) => updateSettings(['durationConfig', 'interval'], Number(e.target.value))}
                         />
                       </div>
                     </div>
@@ -227,30 +257,30 @@ const AdminPage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm mb-1">Monthly Rate</label>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         value={settings.pricing.membership.monthly}
                         onChange={(e) => updateSettings(['pricing', 'membership', 'monthly'], Number(e.target.value))}
-                        prefix="$" 
+                        prefix="$"
                       />
                     </div>
                     <div>
                       <label className="block text-sm mb-1">Yearly Rate</label>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         value={settings.pricing.membership.yearly}
                         onChange={(e) => updateSettings(['pricing', 'membership', 'yearly'], Number(e.target.value))}
-                        prefix="$" 
+                        prefix="$"
                       />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm mb-1">Member Per-Session Discount</label>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       value={settings.pricing.membership.perSessionDiscount}
                       onChange={(e) => updateSettings(['pricing', 'membership', 'perSessionDiscount'], Number(e.target.value))}
-                      suffix="%" 
+                      suffix="%"
                     />
                   </div>
                 </div>

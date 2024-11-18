@@ -4,8 +4,25 @@ import React, { useState, useEffect } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getBusinessById } from "@/lib/mockData";
 import type { Business } from "@/types/business";
+
+const MOCK_BOOKINGS = {
+  "2024-01-18": [
+    { start: "09:00", duration: 1.5 },
+    { start: "14:00", duration: 2 }
+  ]
+};
+
+const DURATION_OPTIONS = [
+  { value: "0.5", label: "30 minutes" },
+  { value: "1", label: "1 hour" },
+  { value: "1.5", label: "1.5 hours" },
+  { value: "2", label: "2 hours" },
+  { value: "2.5", label: "2.5 hours" },
+  { value: "3", label: "3 hours" }
+];
 
 const formatTime = (time: string): string => {
   const [hours] = time.split(':').map(Number);
@@ -19,9 +36,7 @@ const generateTimeSlots = (start: string, end: string) => {
   const [startHour] = start.split(':').map(Number);
   let [endHour] = end.split(':').map(Number);
   
-  if (endHour === 0) {
-    endHour = 24;
-  }
+  if (endHour === 0) endHour = 24;
   
   for (let hour = startHour; hour < endHour; hour++) {
     const displayHour = hour % 24;
@@ -34,11 +49,37 @@ const generateTimeSlots = (start: string, end: string) => {
   return slots;
 };
 
+const isTimeSlotAvailable = (date: Date, startTime: string, duration: number, bookings: any) => {
+  const dateStr = date.toISOString().split('T')[0];
+  const dateBookings = bookings[dateStr] || [];
+  const [startHour] = startTime.split(':').map(Number);
+  const endHour = startHour + duration;
+
+  return !dateBookings.some((booking: any) => {
+    const [bookingStart] = booking.start.split(':').map(Number);
+    const bookingEnd = bookingStart + booking.duration;
+    return !(endHour <= bookingStart || startHour >= bookingEnd);
+  });
+};
+
+const getAvailableDurations = (startTime: string, closeTime: string) => {
+  const [startHour] = startTime.split(':').map(Number);
+  const [closeHour] = closeTime.split(':').map(Number);
+  const adjustedCloseHour = closeHour === 0 ? 24 : closeHour;
+  const hoursUntilClose = adjustedCloseHour - startHour;
+
+  return DURATION_OPTIONS.filter(option => 
+    parseFloat(option.value) <= hoursUntilClose
+  );
+};
+
 export default function BookingPage({ params }: { params: Promise<{ businessId: string }> }) {
   const resolvedParams = React.use(params);
   const [business, setBusiness] = useState<Business | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
+  const [totalPrice, setTotalPrice] = useState<number | null>(null);
   
   useEffect(() => {
     const businessId = Number(resolvedParams.businessId);
@@ -56,7 +97,6 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     );
   }
 
-  // Rest of the component remains the same
   const isWeekend = (date: Date) => {
     const day = date.getDay();
     return day === 0 || day === 6;
@@ -66,7 +106,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     return isWeekend(date) ? business.hours.weekend : business.hours.weekday;
   };
 
-  const getPrice = (time: string) => {
+  const calculatePrice = (time: string, duration: string) => {
     const basePrice = isWeekend(selectedDate) 
       ? business.pricing.weekend 
       : business.pricing.weekday;
@@ -74,7 +114,11 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     const isPeakHour = time >= business.pricing.peakHours.start && 
                       time <= business.pricing.peakHours.end;
     
-    return isPeakHour ? basePrice + business.pricing.peakHours.additionalCost : basePrice;
+    const hourlyRate = isPeakHour ? 
+      basePrice + business.pricing.peakHours.additionalCost : 
+      basePrice;
+
+    return hourlyRate * parseFloat(duration);
   };
 
   const timeSlots = generateTimeSlots(
@@ -82,9 +126,17 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     getHoursForDate(selectedDate).close
   );
 
-  const isPeakTime = (time: string) => {
-    return time >= business.pricing.peakHours.start && 
-           time <= business.pricing.peakHours.end;
+  const handleTimeSelect = (time: string) => {
+    setSelectedTime(time);
+    setSelectedDuration(null);
+    setTotalPrice(null);
+  };
+
+  const handleDurationSelect = (duration: string) => {
+    setSelectedDuration(duration);
+    if (selectedTime) {
+      setTotalPrice(calculatePrice(selectedTime, duration));
+    }
   };
 
   return (
@@ -114,6 +166,8 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                   if (date) {
                     setSelectedDate(date);
                     setSelectedTime(null);
+                    setSelectedDuration(null);
+                    setTotalPrice(null);
                   }
                 }}
                 className="rounded-md border"
@@ -121,32 +175,70 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Times</CardTitle>
-              <p className="text-sm text-gray-500">
-                {isWeekend(selectedDate) ? 'Weekend' : 'Weekday'} Rates
-                {selectedTime && isPeakTime(selectedTime) && ' (Peak Hours)'}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-2">
-                {timeSlots.map((slot) => (
-                  <Button
-                    key={slot.value}
-                    variant={selectedTime === slot.value ? "default" : "outline"}
-                    onClick={() => setSelectedTime(slot.value)}
-                    className="w-full"
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Select Start Time</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  {timeSlots.map((slot) => {
+                    const isAvailable = isTimeSlotAvailable(
+                      selectedDate, 
+                      slot.value,
+                      selectedDuration ? parseFloat(selectedDuration) : 0.5,
+                      MOCK_BOOKINGS
+                    );
+                    return (
+                      <Button
+                        key={slot.value}
+                        variant={selectedTime === slot.value ? "default" : "outline"}
+                        onClick={() => isAvailable && handleTimeSelect(slot.value)}
+                        className={`w-full ${!isAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!isAvailable}
+                      >
+                        {slot.display}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {selectedTime && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Duration</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={selectedDuration || ""}
+                    onValueChange={handleDurationSelect}
                   >
-                    {slot.display} (${getPrice(slot.value)})
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableDurations(
+                        selectedTime,
+                        getHoursForDate(selectedDate).close
+                      ).map((option) => (
+                        <SelectItem 
+                          key={option.value} 
+                          value={option.value}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
-        {selectedTime && (
+        {selectedTime && selectedDuration && totalPrice !== null && (
           <Card className="mt-8">
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
@@ -156,7 +248,10 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     {selectedDate.toLocaleDateString()} at {formatTime(selectedTime)}
                   </p>
                   <p className="text-gray-500">
-                    Price: ${getPrice(selectedTime)}
+                    Duration: {DURATION_OPTIONS.find(opt => opt.value === selectedDuration)?.label}
+                  </p>
+                  <p className="text-gray-500">
+                    Price: ${totalPrice.toFixed(2)}
                   </p>
                 </div>
                 <Button className="bg-green-600 hover:bg-green-700">

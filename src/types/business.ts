@@ -1,5 +1,11 @@
 // types/business.ts
 
+export interface DurationConfig {
+  minDuration: number;  // in minutes
+  maxDuration: number;  // in minutes
+  interval: number;     // in minutes
+}
+
 export interface BusinessHours {
     open: string;
     close: string;
@@ -35,4 +41,5 @@ export interface BusinessHours {
       weekend: BusinessHours;
     };
     pricing: BusinessPricing;
+    durationConfig: DurationConfig;
   }

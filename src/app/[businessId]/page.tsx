@@ -15,15 +15,6 @@ const MOCK_BOOKINGS = {
   ]
 };
 
-const DURATION_OPTIONS = [
-  { value: "0.5", label: "30 minutes" },
-  { value: "1", label: "1 hour" },
-  { value: "1.5", label: "1.5 hours" },
-  { value: "2", label: "2 hours" },
-  { value: "2.5", label: "2.5 hours" },
-  { value: "3", label: "3 hours" }
-];
-
 const formatTime = (time: string): string => {
   const [hours] = time.split(':').map(Number);
   const period = hours >= 12 ? 'PM' : 'AM';
@@ -35,9 +26,9 @@ const generateTimeSlots = (start: string, end: string) => {
   const slots = [];
   const [startHour] = start.split(':').map(Number);
   let [endHour] = end.split(':').map(Number);
-  
+
   if (endHour === 0) endHour = 24;
-  
+
   for (let hour = startHour; hour < endHour; hour++) {
     const displayHour = hour % 24;
     const time = `${displayHour.toString().padStart(2, '0')}:00`;
@@ -62,15 +53,18 @@ const isTimeSlotAvailable = (date: Date, startTime: string, duration: number, bo
   });
 };
 
-const getAvailableDurations = (startTime: string, closeTime: string) => {
-  const [startHour] = startTime.split(':').map(Number);
-  const [closeHour] = closeTime.split(':').map(Number);
-  const adjustedCloseHour = closeHour === 0 ? 24 : closeHour;
-  const hoursUntilClose = adjustedCloseHour - startHour;
-
-  return DURATION_OPTIONS.filter(option => 
-    parseFloat(option.value) <= hoursUntilClose
-  );
+const generateDurationOptions = (config: DurationConfig) => {
+  const options = [];
+  for (let mins = config.minDuration; mins <= config.maxDuration; mins += config.interval) {
+    const hours = mins / 60;
+    options.push({
+      value: hours.toString(),
+      label: hours === 1 ? "1 hour" :
+        hours < 1 ? `${mins} minutes` :
+          `${hours} hours`
+    });
+  }
+  return options;
 };
 
 export default function BookingPage({ params }: { params: Promise<{ businessId: string }> }) {
@@ -80,7 +74,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
-  
+
   useEffect(() => {
     const businessId = Number(resolvedParams.businessId);
     const businessData = getBusinessById(businessId);
@@ -101,21 +95,41 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     const day = date.getDay();
     return day === 0 || day === 6;
   };
-
-  const getHoursForDate = (date: Date) => {
-    return isWeekend(date) ? business.hours.weekend : business.hours.weekday;
+  const isPeakTime = (time: string) => {
+    if (!business?.pricing.peakHours.enabled) return false;
+    return time >= business.pricing.peakHours.start && 
+           time <= business.pricing.peakHours.end;
   };
 
+  const getHoursForDate = (date: Date) => {
+    if (!business) return { open: "00:00", close: "00:00" };
+    const day = date.getDay();
+    // Convert day number to day name
+    const dayMap: Record<number, keyof WeeklySchedule> = {
+      0: 'sunday',
+      1: 'monday',
+      2: 'tuesday',
+      3: 'wednesday',
+      4: 'thursday',
+      5: 'friday',
+      6: 'saturday'
+    };
+    const dayName = dayMap[day];
+    return business.weeklySchedule[dayName];
+  };
+
+
+
   const calculatePrice = (time: string, duration: string) => {
-    const basePrice = isWeekend(selectedDate) 
-      ? business.pricing.weekend 
+    const basePrice = isWeekend(selectedDate)
+      ? business.pricing.weekend
       : business.pricing.weekday;
-    
-    const isPeakHour = time >= business.pricing.peakHours.start && 
-                      time <= business.pricing.peakHours.end;
-    
-    const hourlyRate = isPeakHour ? 
-      basePrice + business.pricing.peakHours.additionalCost : 
+
+    const isPeakHour = time >= business.pricing.peakHours.start &&
+      time <= business.pricing.peakHours.end;
+
+    const hourlyRate = isPeakHour ?
+      basePrice + business.pricing.peakHours.additionalCost :
       basePrice;
 
     return hourlyRate * parseFloat(duration);
@@ -183,21 +197,20 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
               <CardContent>
                 <div className="grid grid-cols-3 gap-2">
                   {timeSlots.map((slot) => {
-                    const isAvailable = isTimeSlotAvailable(
-                      selectedDate, 
-                      slot.value,
-                      selectedDuration ? parseFloat(selectedDuration) : 0.5,
-                      MOCK_BOOKINGS
-                    );
+                    const isPeak = isPeakTime(slot.value);
                     return (
                       <Button
                         key={slot.value}
                         variant={selectedTime === slot.value ? "default" : "outline"}
-                        onClick={() => isAvailable && handleTimeSelect(slot.value)}
-                        className={`w-full ${!isAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        disabled={!isAvailable}
+                        onClick={() => handleTimeSelect(slot.value)}
+                        className="w-full h-16 relative" // Made button taller to accommodate price indicator
                       >
                         {slot.display}
+                        <span
+                          className={`absolute top-0 right-1 text-xs text-green-500`}
+                        >
+                          {isPeak ? '$$' : '$'}
+                        </span>
                       </Button>
                     );
                   })}
@@ -219,14 +232,8 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                       <SelectValue placeholder="Select duration" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getAvailableDurations(
-                        selectedTime,
-                        getHoursForDate(selectedDate).close
-                      ).map((option) => (
-                        <SelectItem 
-                          key={option.value} 
-                          value={option.value}
-                        >
+                      {generateDurationOptions(business.durationConfig).map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
                       ))}
@@ -248,7 +255,8 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     {selectedDate.toLocaleDateString()} at {formatTime(selectedTime)}
                   </p>
                   <p className="text-gray-500">
-                    Duration: {DURATION_OPTIONS.find(opt => opt.value === selectedDuration)?.label}
+                    Duration: {generateDurationOptions(business.durationConfig)
+                      .find(opt => opt.value === selectedDuration)?.label}
                   </p>
                   <p className="text-gray-500">
                     Price: ${totalPrice.toFixed(2)}

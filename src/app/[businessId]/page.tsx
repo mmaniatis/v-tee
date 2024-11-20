@@ -15,6 +15,8 @@ const MOCK_BOOKINGS = {
   ]
 };
 
+const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
 const formatTime = (time: string): string => {
   const [hours] = time.split(':').map(Number);
   const period = hours >= 12 ? 'PM' : 'AM';
@@ -95,10 +97,20 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     const day = date.getDay();
     return day === 0 || day === 6;
   };
+
   const isPeakTime = (time: string) => {
     if (!business?.pricing.peakHours.enabled) return false;
-    return time >= business.pricing.peakHours.start && 
-           time <= business.pricing.peakHours.end;
+
+    // Get day name from selected date
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = days[selectedDate.getDay()] as keyof WeeklySchedule;
+
+    // First check if peak hours are enabled for this specific day
+    if (!business.weeklySchedule[dayName].peakHoursEnabled) return false;
+
+    // Then check if time is within peak hours
+    return time >= business.pricing.peakHours.start &&
+      time <= business.pricing.peakHours.end;
   };
 
   const getHoursForDate = (date: Date) => {
@@ -158,19 +170,21 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
       <div className="max-w-7xl mx-auto px-4">
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>{business.name}</CardTitle>
-            <p className="text-gray-500">{business.location}</p>
-            <p className="text-gray-600 mt-2">{business.description}</p>
+            <CardTitle style={{ color: business.uiSettings.colors.primary }}>
+              {business.uiSettings.branding.displayName}
+            </CardTitle>
+            <p className="text-gray-500">{business.uiSettings.branding.description}</p>
             <p className="text-sm text-gray-500 mt-2">
               All times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}
             </p>
           </CardHeader>
         </Card>
 
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Card>
             <CardHeader>
-              <CardTitle>Select Date</CardTitle>
+              <CardTitle style={{ color: business.uiSettings.colors.secondary }}>Select Date</CardTitle>
             </CardHeader>
             <CardContent>
               <Calendar
@@ -180,8 +194,6 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                   if (date) {
                     setSelectedDate(date);
                     setSelectedTime(null);
-                    setSelectedDuration(null);
-                    setTotalPrice(null);
                   }
                 }}
                 className="rounded-md border"
@@ -192,25 +204,39 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Select Start Time</CardTitle>
+                <CardTitle style={{ color: business.uiSettings.colors.secondary }}>Available Times</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-2">
                   {timeSlots.map((slot) => {
+                    const dayName = days[selectedDate.getDay()] as keyof WeeklySchedule;
+                    const showPricing = business.weeklySchedule[dayName].peakHoursEnabled;
                     const isPeak = isPeakTime(slot.value);
                     return (
                       <Button
                         key={slot.value}
                         variant={selectedTime === slot.value ? "default" : "outline"}
                         onClick={() => handleTimeSelect(slot.value)}
-                        className="w-full h-16 relative" // Made button taller to accommodate price indicator
+                        className="w-full h-16 relative"
+                        style={selectedTime === slot.value ? {
+                          backgroundColor: business.uiSettings.colors.primary,
+                          color: 'white',
+                          border: 'none'
+                        } : {
+                          borderColor: business.uiSettings.colors.primary,
+                          color: business.uiSettings.colors.primary,
+                          backgroundColor: 'transparent'
+                        }}
                       >
                         {slot.display}
-                        <span
-                          className={`absolute top-0 right-1 text-xs text-green-500`}
-                        >
-                          {isPeak ? '$$' : '$'}
-                        </span>
+                        {showPricing && (
+                          <span
+                            className={`absolute top-1 right-1 text-xs ${isPeak ? 'text-green-600' : 'text-green-500'
+                              }`}
+                          >
+                            {isPeak ? '$$' : '$'}
+                          </span>
+                        )}
                       </Button>
                     );
                   })}
@@ -250,7 +276,9 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold">Selected Booking</h3>
+                  <h3 className="text-lg font-semibold" style={{ color: business.uiSettings.colors.secondary }}>
+                    Selected Booking
+                  </h3>
                   <p className="text-gray-500">
                     {selectedDate.toLocaleDateString()} at {formatTime(selectedTime)}
                   </p>
@@ -262,7 +290,13 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     Price: ${totalPrice.toFixed(2)}
                   </p>
                 </div>
-                <Button className="bg-green-600 hover:bg-green-700">
+                <Button
+                  className="transition-colors"
+                  style={{
+                    backgroundColor: business.uiSettings.colors.accent,
+                    color: 'white'
+                  }}
+                >
                   Confirm Booking
                 </Button>
               </div>

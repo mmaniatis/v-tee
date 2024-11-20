@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { getBusinessById } from '@/lib/mockData';
 import type { Business } from '@/types/business';
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { HexColorPicker, HexColorInput } from "react-colorful";
+import { Eye } from "lucide-react";
 
 
 const HOURS = Array.from({ length: 24 }, (_, i) => ({
@@ -26,21 +27,96 @@ const DAYS_OF_WEEK = [
 export default function AdminPage({ params }: { params: Promise<{ businessId: string }> }) {
   const resolvedParams = React.use(params);
   const [settings, setSettings] = useState<Business | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
+  // Load initial data only once
   useEffect(() => {
-    const businessData = getBusinessById(Number(resolvedParams.businessId));
-    if (businessData) {
-      setSettings(businessData);
+    if (!initialized) {
+      const businessData = getBusinessById(Number(resolvedParams.businessId));
+      if (businessData) {
+        setSettings(businessData);
+        setInitialized(true);
+      }
     }
-  }, [resolvedParams.businessId]);
+  }, [resolvedParams.businessId, initialized]);
 
   if (!settings) {
+    return <div>Loading...</div>;
+  }
+
+  const updateColors = (colorType: 'primary' | 'secondary' | 'accent', value: string) => {
+    setSettings(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        uiSettings: {
+          ...prev.uiSettings,
+          colors: {
+            ...prev.uiSettings.colors,
+            [colorType]: value
+          }
+        }
+      };
+    });
+  };
+
+  const ColorPicker = ({ 
+    label, 
+    value, 
+    onChange 
+  }: { 
+    label: string; 
+    value: string; 
+    onChange: (color: string) => void; 
+  }) => {
+    // Local state to handle dragging
+    const [localColor, setLocalColor] = useState(value);
+  
+    // Update local color and parent state
+    const handleColorChange = (newColor: string) => {
+      setLocalColor(newColor);
+      onChange(newColor);
+    };
+  
+    // Update local state when prop changes
+    useEffect(() => {
+      setLocalColor(value);
+    }, [value]);
+  
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-xl">Loading...</p>
+      <div>
+        <Label>{label}</Label>
+        <div className="mt-2">
+          <HexColorPicker 
+            color={localColor} 
+            onChange={handleColorChange}
+          />
+          <HexColorInput
+            color={localColor}
+            onChange={handleColorChange}
+            prefixed
+            className="mt-2 w-full border rounded-md px-3 py-2"
+          />
+        </div>
       </div>
     );
-  }
+  };
+
+  const updateBranding = (field: string, value: string) => {
+    setSettings(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        uiSettings: {
+          ...prev.uiSettings,
+          branding: {
+            ...prev.uiSettings.branding,
+            [field]: value
+          }
+        }
+      };
+    });
+  };
 
   // Weekly Schedule Updates
   const updateDaySchedule = (
@@ -148,6 +224,10 @@ export default function AdminPage({ params }: { params: Promise<{ businessId: st
             >
               Duration Settings
             </TabsTrigger>
+            <TabsTrigger value="ui"
+              className="py-4 px-8 text-lg font-medium border-b-2 border-transparent hover:border-gray-300 data-[state=active]:border-green-600 data-[state=active]:text-green-600"
+
+            >UI Customization</TabsTrigger>
           </TabsList>
           <TabsContent value="hours">
             <Card>
@@ -157,58 +237,77 @@ export default function AdminPage({ params }: { params: Promise<{ businessId: st
               <CardContent>
                 <div className="space-y-6">
                   {DAYS_OF_WEEK.map((day) => (
-                    <div key={day} className="flex items-center gap-8">
-                      <div className="w-32 flex items-center gap-2">
-                        <Switch
-                          checked={settings.weeklySchedule[day].isOpen}
-                          onCheckedChange={(checked) =>
-                            updateDaySchedule(day, 'isOpen', checked)
-                          }
-                        />
-                        <Label className="capitalize">{day}</Label>
-                      </div>
+                    <div key={day} className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-8">
+                          <div className="w-32 flex items-center gap-2">
+                            <Switch
+                              checked={settings.weeklySchedule[day].isOpen}
+                              onCheckedChange={(checked) =>
+                                updateDaySchedule(day, 'isOpen', checked)
+                              }
+                            />
+                            <Label className="capitalize">{day}</Label>
+                          </div>
 
-                      {settings.weeklySchedule[day].isOpen && (
-                        <div className="flex items-center gap-4">
-                          <Select
-                            value={settings.weeklySchedule[day].open}
-                            onValueChange={(value) =>
-                              updateDaySchedule(day, 'open', value)
-                            }
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue placeholder="Open" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {HOURS.map((hour) => (
-                                <SelectItem key={hour.value} value={hour.value}>
-                                  {hour.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {settings.weeklySchedule[day].isOpen && (
+                            <div className="flex items-center gap-4">
+                              <Select
+                                value={settings.weeklySchedule[day].open}
+                                onValueChange={(value) =>
+                                  updateDaySchedule(day, 'open', value)
+                                }
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue placeholder="Open" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {HOURS.map((hour) => (
+                                    <SelectItem key={hour.value} value={hour.value}>
+                                      {hour.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
 
-                          <span>to</span>
+                              <span>to</span>
 
-                          <Select
-                            value={settings.weeklySchedule[day].close}
-                            onValueChange={(value) =>
-                              updateDaySchedule(day, 'close', value)
-                            }
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue placeholder="Close" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {HOURS.map((hour) => (
-                                <SelectItem key={hour.value} value={hour.value}>
-                                  {hour.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                              <Select
+                                value={settings.weeklySchedule[day].close}
+                                onValueChange={(value) =>
+                                  updateDaySchedule(day, 'close', value)
+                                }
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue placeholder="Close" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {HOURS.map((hour) => (
+                                    <SelectItem key={hour.value} value={hour.value}>
+                                      {hour.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </div>
-                      )}
+
+                        {settings.weeklySchedule[day].isOpen && settings.pricing.peakHours.enabled && (
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`peak-${day}`} className="text-sm text-gray-500">
+                              Peak Hours Pricing
+                            </Label>
+                            <Switch
+                              id={`peak-${day}`}
+                              checked={settings.weeklySchedule[day].peakHoursEnabled}
+                              onCheckedChange={(checked) =>
+                                updateDaySchedule(day, 'peakHoursEnabled', checked)
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -360,8 +459,188 @@ export default function AdminPage({ params }: { params: Promise<{ businessId: st
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="ui">
+            <div className="space-y-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Branding</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4">
+                    <div>
+                      <Label>Business Name (Legal Name)</Label>
+                      <Input
+                        value={settings.uiSettings.branding.businessName}
+                        onChange={(e) => updateBranding('businessName', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Display Name (Shown on Booking Page)</Label>
+                      <Input
+                        value={settings.uiSettings.branding.displayName}
+                        onChange={(e) => updateBranding('displayName', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Business Description</Label>
+                      <Input
+                        value={settings.uiSettings.branding.description}
+                        onChange={(e) => updateBranding('description', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Color Scheme</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Color Scheme</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-8">
+                        <ColorPicker
+                          label="Primary Color"
+                          value={settings.uiSettings.colors.primary}
+                          onChange={(color) => updateColors('primary', color)}
+                        />
+                        <ColorPicker
+                          label="Secondary Color"
+                          value={settings.uiSettings.colors.secondary}
+                          onChange={(color) => updateColors('secondary', color)}
+                        />
+                        <ColorPicker
+                          label="Accent Color"
+                          value={settings.uiSettings.colors.accent}
+                          onChange={(color) => updateColors('accent', color)}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </CardContent>
+              </Card>
+
+              {/* Preview Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="w-4 h-4" />
+                    Preview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border p-6 space-y-6">
+                    <div>
+                      <h3
+                        className="text-2xl font-bold"
+                        style={{ color: settings.uiSettings.colors.primary }}
+                      >
+                        {settings.uiSettings.branding.displayName}
+                      </h3>
+                      <p className="text-gray-600">
+                        {settings.uiSettings.branding.description}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4
+                        className="text-lg font-semibold mb-3"
+                        style={{ color: settings.uiSettings.colors.secondary }}
+                      >
+                        Available Times
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          style={{
+                            backgroundColor: settings.uiSettings.colors.primary,
+                            color: 'white'
+                          }}
+                        >
+                          9:00 AM
+                        </Button>
+                        <Button
+                          variant="outline"
+                          style={{
+                            borderColor: settings.uiSettings.colors.primary,
+                            color: settings.uiSettings.colors.primary
+                          }}
+                        >
+                          10:00 AM
+                        </Button>
+                        <Button
+                          variant="outline"
+                          style={{
+                            borderColor: settings.uiSettings.colors.primary,
+                            color: settings.uiSettings.colors.primary
+                          }}
+                        >
+                          11:00 AM
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-lg p-4"
+                      style={{ backgroundColor: `${settings.uiSettings.colors.secondary}10` }}
+                    >
+                      <h4
+                        className="text-lg font-semibold mb-2"
+                        style={{ color: settings.uiSettings.colors.secondary }}
+                      >
+                        Selected Booking
+                      </h4>
+                      <p className="text-gray-600 mb-4">Thursday, Nov 21 at 9:00 AM</p>
+                      <Button
+                        style={{
+                          backgroundColor: settings.uiSettings.colors.accent,
+                          color: 'white'
+                        }}
+                      >
+                        Confirm Booking
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    <h4 className="font-medium text-sm text-gray-600">Color Palette</h4>
+                    <div className="flex gap-4">
+                      <div className="space-y-1">
+                        <div
+                          className="w-16 h-16 rounded-lg border"
+                          style={{ backgroundColor: settings.uiSettings.colors.primary }}
+                        />
+                        <p className="text-xs text-center text-gray-600">Primary</p>
+                      </div>
+                      <div className="space-y-1">
+                        <div
+                          className="w-16 h-16 rounded-lg border"
+                          style={{ backgroundColor: settings.uiSettings.colors.secondary }}
+                        />
+                        <p className="text-xs text-center text-gray-600">Secondary</p>
+                      </div>
+                      <div className="space-y-1">
+                        <div
+                          className="w-16 h-16 rounded-lg border"
+                          style={{ backgroundColor: settings.uiSettings.colors.accent }}
+                        />
+                        <p className="text-xs text-center text-gray-600">Accent</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </div >
   );
 }

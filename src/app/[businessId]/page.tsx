@@ -15,14 +15,6 @@ import { getBusiness, createReservation } from '@/lib/db';
 import { Toast } from '@/components/ui/toast';
 import type { FormattedBusiness } from '@/types/business';
 
-// For now, keep MOCK_BOOKINGS until we implement reservation fetching
-const MOCK_BOOKINGS = {
-  "2024-01-18": [
-    { start: "09:00", duration: 1.5 },
-    { start: "14:00", duration: 2 }
-  ]
-};
-
 export default function BookingPage({ params }: { params: Promise<{ businessId: string }> }) {
   const resolvedParams = React.use(params);
   const [business, setBusiness] = useState<FormattedBusiness | null>(null);

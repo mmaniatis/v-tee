@@ -5,15 +5,17 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getBusinessById } from "@/lib/mockData";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { formatTime, generateTimeSlots, isTimeSlotAvailable, getHoursForDate, DAYS } from '@/utils/timeUtils';
 import { isPeakTime, calculatePrice } from '@/utils/pricingUtils';
 import { getButtonStyles, darken } from '@/utils/uiUtils';
-import type { Business } from '@/types/business';
 import { generateDurationOptions } from '@/utils/durationUtils';
+import { getBusiness, createReservation } from '@/lib/db';
+import { Toast } from '@/components/ui/toast';
+import type { FormattedBusiness } from '@/types/business';
 
+// For now, keep MOCK_BOOKINGS until we implement reservation fetching
 const MOCK_BOOKINGS = {
   "2024-01-18": [
     { start: "09:00", duration: 1.5 },
@@ -23,21 +25,26 @@ const MOCK_BOOKINGS = {
 
 export default function BookingPage({ params }: { params: Promise<{ businessId: string }> }) {
   const resolvedParams = React.use(params);
-  const [business, setBusiness] = useState<Business | null>(null);
+  const [business, setBusiness] = useState<FormattedBusiness | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
 
   useEffect(() => {
-    const businessId = Number(resolvedParams.businessId);
-    const businessData = getBusinessById(businessId);
-    if (businessData) {
-      setBusiness(businessData);
+    async function loadBusiness() {
+      const businessData = await getBusiness(Number(resolvedParams.businessId));
+      if (businessData) {
+        setBusiness(businessData);
+      }
+      setLoading(false);
     }
+    loadBusiness();
   }, [resolvedParams.businessId]);
 
-  if (!business) return <LoadingSpinner />;
+  if (loading || !business) return <LoadingSpinner />;
 
   const timeSlots = generateTimeSlots(
     getHoursForDate(selectedDate, business).open,
@@ -57,10 +64,48 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     }
   };
 
+  const handleBooking = async () => {
+    if (!selectedTime || !selectedDuration || totalPrice === null) return;
+
+    setBooking(true);
+    try {
+      const reservation = await createReservation(
+        business.id,
+        selectedDate.toISOString().split('T')[0],
+        selectedTime,
+        parseFloat(selectedDuration),
+        totalPrice
+      );
+
+      if (reservation) {
+        Toast({
+          title: "Booking Confirmed",
+          description: `Your booking for ${selectedDate.toLocaleDateString()} at ${formatTime(selectedTime)} has been confirmed.`
+        });
+
+        // Reset form
+        setSelectedTime(null);
+        setSelectedDuration(null);
+        setTotalPrice(null);
+      } else {
+        throw new Error('Failed to create reservation');
+      }
+    } catch (error) {
+      Toast({
+        title: "Booking Failed",
+        description: "Unable to complete your booking. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setBooking(false);
+    }
+  };
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4">
+          {/* Header Card */}
           <Card className="mb-8">
             <CardHeader>
               <CardTitle style={{ color: business.uiSettings.colors.primary }}>
@@ -73,7 +118,9 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             </CardHeader>
           </Card>
 
+          {/* Booking Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Calendar Card */}
             <Card>
               <CardHeader>
                 <CardTitle style={{ color: business.uiSettings.colors.secondary }}>
@@ -95,6 +142,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
               </CardContent>
             </Card>
 
+            {/* Time Selection */}
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -129,12 +177,13 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                             </span>
                           )}
                         </Button>
-                      )}
-                    )}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Duration Selection */}
               {selectedTime && (
                 <Card>
                   <CardHeader>
@@ -162,6 +211,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             </div>
           </div>
 
+          {/* Booking Summary */}
           {selectedTime && selectedDuration && totalPrice !== null && (
             <Card className="mt-8">
               <CardContent className="pt-6">
@@ -188,12 +238,15 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     className="transition-colors"
                     style={{
                       backgroundColor: business.uiSettings.colors.accent,
-                      color: 'white', '&:hover': {
+                      color: 'white',
+                      '&:hover': {
                         backgroundColor: darken(business.uiSettings.colors.accent, 0.1)
                       }
                     }}
+                    onClick={handleBooking}
+                    disabled={booking}
                   >
-                    Confirm Booking
+                    {booking ? "Confirming..." : "Confirm Booking"}
                   </Button>
                 </div>
               </CardContent>

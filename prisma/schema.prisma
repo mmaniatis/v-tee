@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int               @id @default(autoincrement())
+  business     Business         @relation(fields: [businessId], references: [id])
+  businessId   Int
+  isMember     Boolean           @default(false)
+  userRole     Role              @relation(fields: [userRoleId], references: [id], name: "UserToRole")
+  userRoleId   Int
+  username     String            @unique
+  email        String            @unique
+  transactions TransactionHistory[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model Role {
+  id        Int       @id @default(autoincrement())
+  users     User[]    @relation(name: "UserToRole")
+  customer  Boolean
+  employee  Boolean
+  supervisor Boolean
+  admin     Boolean
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Membership {
+  id          Int       @id @default(autoincrement())
+  business    Business  @relation(fields: [businessId], references: [id])
+  businessId  Int       @unique
+  yearlyCost  Float
+  monthlyCost Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Business {
+  id             Int             @id @default(autoincrement())
+  name           String
+  location       String
+  description    String
+  users          User[]
+  schedules      Schedule[]
+  membership     Membership?
+  durationConfig DurationConfig?
+  pricing        Pricing?
+  reservations   Reservation[]
+  transactions   TransactionHistory[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Schedule {
+  id                Int           @id @default(autoincrement())
+  business          Business      @relation(fields: [businessId], references: [id])
+  businessId        Int           @unique
+  weeklySchedule    WeeklySchedule @relation(fields: [weeklyScheduleId], references: [id])
+  weeklyScheduleId  Int           @unique
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model WeeklySchedule {
+  id                      Int       @id @default(autoincrement())
+  schedule                Schedule?
+  weekdayOpen             String
+  weekdayClose            String
+  weekendOpen             String
+  weekendClose            String
+  daysClosed              String[]
+  peakHoursStart          String?
+  peakHoursEnd            String?
+  weekdayPeakHoursEnabled Boolean   @default(false)
+  weekendPeakHoursEnabled Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+model DurationConfig {
+  id          Int       @id @default(autoincrement())
+  business    Business  @relation(fields: [businessId], references: [id])
+  businessId  Int       @unique
+  minDuration Float
+  maxDuration Float
+  interval    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Pricing {
+  id                       Int      @id @default(autoincrement())
+  business                 Business @relation(fields: [businessId], references: [id])
+  businessId               Int      @unique
+  weekdayPrice             Int
+  weekendPrice             Int
+  membershipDiscount       Float
+  soloPricingDiscount      Float
+  peakHourPricingEnabled   Boolean  @default(false)
+  peakHourPriceAdditionalCost Int
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+model Reservation {
+  id            Int               @id @default(autoincrement())
+  business      Business         @relation(fields: [businessId], references: [id])
+  businessId    Int
+  date          String
+  price         Float
+  startTime     String
+  duration      Float
+  transactions  TransactionHistory[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model TransactionHistory {
+  id            Int              @id @default(autoincrement())
+  business      Business         @relation(fields: [businessId], references: [id])
+  businessId    Int
+  user          User             @relation(fields: [userId], references: [id])
+  userId        Int
+  reservation   Reservation      @relation(fields: [reservationId], references: [id])
+  reservationId Int
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}

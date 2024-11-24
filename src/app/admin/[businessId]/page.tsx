@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { getBusinessById } from '@/lib/mockData';
-import type { Business } from '@/types/business';
 import { HexColorPicker, HexColorInput } from "react-colorful";
 import { Eye } from "lucide-react";
-
+import { getBusiness, updateBusiness } from '@/lib/db';
+import type { FormattedBusiness } from '@/types/business';
+import { Toast } from '@/components/ui/toast';
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => ({
   value: `${i.toString().padStart(2, '0')}:00`,
@@ -26,23 +27,23 @@ const DAYS_OF_WEEK = [
 
 export default function AdminPage({ params }: { params: Promise<{ businessId: string }> }) {
   const resolvedParams = React.use(params);
-  const [settings, setSettings] = useState<Business | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const [settings, setSettings] = useState<FormattedBusiness | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Load initial data only once
   useEffect(() => {
-    if (!initialized) {
-      const businessData = getBusinessById(Number(resolvedParams.businessId));
+    async function loadBusiness() {
+      const businessData = await getBusiness(Number(resolvedParams.businessId));
       if (businessData) {
         setSettings(businessData);
-        setInitialized(true);
       }
+      setLoading(false);
     }
-  }, [resolvedParams.businessId, initialized]);
+    loadBusiness();
+  }, [resolvedParams.businessId]);
 
-  if (!settings) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <LoadingSpinner />;
+  if (!settings) return <div>Business not found</div>;
 
   const updateColors = (colorType: 'primary' | 'secondary' | 'accent', value: string) => {
     setSettings(prev => {
@@ -186,10 +187,30 @@ export default function AdminPage({ params }: { params: Promise<{ businessId: st
     });
   };
 
-  const handleSave = () => {
-    console.log('Saving settings:', settings);
-    // Here you would typically make an API call to save the settings
+  const handleSave = async () => {
+    if (!settings) return;
+    setSaving(true);
+    try {
+      const success = await updateBusiness(settings.id, settings);
+      if (success) {
+        Toast({
+          title: "Settings saved",
+          description: "Your changes have been saved successfully."
+        });
+      } else {
+        throw new Error('Failed to save settings');
+      }
+    } catch (error) {
+      Toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -199,10 +220,12 @@ export default function AdminPage({ params }: { params: Promise<{ businessId: st
           <Button
             onClick={handleSave}
             className="bg-green-600 hover:bg-green-700"
+            disabled={saving}
           >
-            Save Changes
+            {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
+
 
         <Tabs defaultValue="hours">
           <TabsList className="flex -mb-px space-x-8">

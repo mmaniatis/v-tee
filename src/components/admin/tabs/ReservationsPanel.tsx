@@ -1,79 +1,81 @@
-// components/admin/tabs/ReservationsPanel.tsx
-'use client';
-
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { formatTime } from '@/utils/timeUtils';
 import type { Reservation } from '@prisma/client';
-import { TabsContent } from "@/components/ui/tabs";
 
 interface ReservationsPanelProps {
   selectedDate: Date;
   reservations: Reservation[];
-  setSelectedDate: (date: Date | undefined) => void;
+  setSelectedDate: (date: Date) => void;
 }
 
-export function ReservationsPanel({
+export default function ReservationsPanel({
   selectedDate,
   reservations,
-  setSelectedDate,
+  setSelectedDate
 }: ReservationsPanelProps) {
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(price);
+  };
+
   return (
-    <TabsContent value="reservations">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Reservations
+          <CardTitle>Select Date</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => date && setSelectedDate(date)}
+            className="rounded-md border"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Reservations for {selectedDate.toLocaleDateString()}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-              />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">
-                Reservations for {selectedDate.toLocaleDateString()}
-              </h3>
-              {reservations.length > 0 ? (
-                <div className="space-y-4">
-                  {reservations.map((reservation) => (
-                    <Card key={reservation.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">
-                              {formatTime(reservation.startTime)}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              Duration: {reservation.duration} minutes
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              Price: ${reservation.price.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+          {reservations.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">
+              No reservations for this date
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {reservations.map((reservation) => (
+                <div
+                  key={reservation.id}
+                  className="p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">
+                        {formatTime(reservation.startTime)}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Duration: {reservation.duration} minutes
+                      </p>
+                    </div>
+                    <Badge variant="secondary">
+                      {formatPrice(reservation.price)}
+                    </Badge>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No reservations for this date
-                </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
-    </TabsContent>
+    </div>
   );
 }

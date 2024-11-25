@@ -1,48 +1,9 @@
-// components/admin/tabs/UIPanel.tsx
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye } from "lucide-react";
-import { HexColorPicker, HexColorInput } from "react-colorful";
+import { HexColorPicker } from "react-colorful";
 import type { FormattedBusiness } from '@/types/business';
-
-interface ColorPickerProps {
-  label: string;
-  value: string;
-  onChange: (color: string) => void;
-}
-
-const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => {
-  const [localColor, setLocalColor] = useState(value);
-
-  const handleColorChange = (newColor: string) => {
-    setLocalColor(newColor);
-    onChange(newColor);
-  };
-
-  useEffect(() => {
-    setLocalColor(value);
-  }, [value]);
-
-  return (
-    <div>
-      <Label>{label}</Label>
-      <div className="mt-2">
-        <HexColorPicker 
-          color={localColor} 
-          onChange={handleColorChange}
-        />
-        <HexColorInput
-          color={localColor}
-          onChange={handleColorChange}
-          prefixed
-          className="mt-2 w-full border rounded-md px-3 py-2"
-        />
-      </div>
-    </div>
-  );
-};
 
 interface UIPanelProps {
   settings: FormattedBusiness;
@@ -50,106 +11,164 @@ interface UIPanelProps {
   updateColors: (colorType: 'primary' | 'secondary' | 'accent', value: string) => void;
 }
 
-export function UIPanel({
+export default function UIPanel({
   settings,
   updateBranding,
-  updateColors,
+  updateColors
 }: UIPanelProps) {
+  const [activeColorPicker, setActiveColorPicker] = React.useState<'primary' | 'secondary' | 'accent' | null>(null);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Branding Settings */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="w-5 h-5" />
-            Branding
-          </CardTitle>
+          <CardTitle>Branding</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            <div>
-              <Label>Business Name (Legal Name)</Label>
-              <Input
-                value={settings.uiSettings.branding.businessName}
-                onChange={(e) => updateBranding('businessName', e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Your official business name
-              </p>
-            </div>
-            <div>
-              <Label>Display Name (Shown on Booking Page)</Label>
-              <Input
-                value={settings.uiSettings.branding.displayName}
-                onChange={(e) => updateBranding('displayName', e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Name shown to customers on the booking page
-              </p>
-            </div>
-            <div>
-              <Label>Business Description</Label>
-              <Input
-                value={settings.uiSettings.branding.description}
-                onChange={(e) => updateBranding('description', e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Brief description of your business
-              </p>
-            </div>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="businessName">Business Name</Label>
+            <Input
+              id="businessName"
+              value={settings.uiSettings.branding.businessName}
+              onChange={(e) => updateBranding('businessName', e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="displayName">Display Name</Label>
+            <Input
+              id="displayName"
+              value={settings.uiSettings.branding.displayName}
+              onChange={(e) => updateBranding('displayName', e.target.value)}
+            />
+            <p className="text-sm text-gray-500">
+              This is the name shown to customers
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Business Description</Label>
+            <Input
+              id="description"
+              value={settings.uiSettings.branding.description}
+              onChange={(e) => updateBranding('description', e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
 
+      {/* Color Settings */}
       <Card>
         <CardHeader>
           <CardTitle>Color Scheme</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <ColorPicker
-              label="Primary Color"
-              value={settings.uiSettings.colors.primary}
-              onChange={(color) => updateColors('primary', color)}
-            />
-            <ColorPicker
-              label="Secondary Color"
-              value={settings.uiSettings.colors.secondary}
-              onChange={(color) => updateColors('secondary', color)}
-            />
-            <ColorPicker
-              label="Accent Color"
-              value={settings.uiSettings.colors.accent}
-              onChange={(color) => updateColors('accent', color)}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Primary Color */}
+            <div className="space-y-2">
+              <Label>Primary Color</Label>
+              <div className="space-y-2">
+                <div
+                  className="w-full h-10 rounded-md cursor-pointer border"
+                  style={{ backgroundColor: settings.uiSettings.colors.primary }}
+                  onClick={() => setActiveColorPicker(activeColorPicker === 'primary' ? null : 'primary')}
+                />
+                <Input
+                  value={settings.uiSettings.colors.primary}
+                  onChange={(e) => updateColors('primary', e.target.value)}
+                />
+                {activeColorPicker === 'primary' && (
+                  <div className="absolute z-10 mt-2">
+                    <HexColorPicker
+                      color={settings.uiSettings.colors.primary}
+                      onChange={(color) => updateColors('primary', color)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Secondary Color */}
+            <div className="space-y-2">
+              <Label>Secondary Color</Label>
+              <div className="space-y-2">
+                <div
+                  className="w-full h-10 rounded-md cursor-pointer border"
+                  style={{ backgroundColor: settings.uiSettings.colors.secondary }}
+                  onClick={() => setActiveColorPicker(activeColorPicker === 'secondary' ? null : 'secondary')}
+                />
+                <Input
+                  value={settings.uiSettings.colors.secondary}
+                  onChange={(e) => updateColors('secondary', e.target.value)}
+                />
+                {activeColorPicker === 'secondary' && (
+                  <div className="absolute z-10 mt-2">
+                    <HexColorPicker
+                      color={settings.uiSettings.colors.secondary}
+                      onChange={(color) => updateColors('secondary', color)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Accent Color */}
+            <div className="space-y-2">
+              <Label>Accent Color</Label>
+              <div className="space-y-2">
+                <div
+                  className="w-full h-10 rounded-md cursor-pointer border"
+                  style={{ backgroundColor: settings.uiSettings.colors.accent }}
+                  onClick={() => setActiveColorPicker(activeColorPicker === 'accent' ? null : 'accent')}
+                />
+                <Input
+                  value={settings.uiSettings.colors.accent}
+                  onChange={(e) => updateColors('accent', e.target.value)}
+                />
+                {activeColorPicker === 'accent' && (
+                  <div className="absolute z-10 mt-2">
+                    <HexColorPicker
+                      color={settings.uiSettings.colors.accent}
+                      onChange={(color) => updateColors('accent', color)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Color Preview */}
-          <div className="mt-8">
-            <h4 className="font-medium mb-4">Preview</h4>
-            <div className="flex gap-4">
-              <div className="space-y-1">
-                <div
-                  className="w-16 h-16 rounded-lg border"
+          <div className="mt-8 p-4 rounded-lg border">
+            <h3 className="text-lg font-medium mb-4">Preview</h3>
+            <div className="space-y-4">
+              <div className="flex space-x-4">
+                <button
+                  className="px-4 py-2 rounded-md text-white"
                   style={{ backgroundColor: settings.uiSettings.colors.primary }}
-                />
-                <p className="text-xs text-center text-gray-600">Primary</p>
-              </div>
-              <div className="space-y-1">
-                <div
-                  className="w-16 h-16 rounded-lg border"
+                >
+                  Primary Button
+                </button>
+                <button
+                  className="px-4 py-2 rounded-md text-white"
                   style={{ backgroundColor: settings.uiSettings.colors.secondary }}
-                />
-                <p className="text-xs text-center text-gray-600">Secondary</p>
-              </div>
-              <div className="space-y-1">
-                <div
-                  className="w-16 h-16 rounded-lg border"
+                >
+                  Secondary Button
+                </button>
+                <button
+                  className="px-4 py-2 rounded-md text-white"
                   style={{ backgroundColor: settings.uiSettings.colors.accent }}
-                />
-                <p className="text-xs text-center text-gray-600">Accent</p>
+                >
+                  Accent Button
+                </button>
+              </div>
+              <div 
+                className="p-4 rounded-md"
+                style={{ backgroundColor: settings.uiSettings.colors.primary + '10' }}
+              >
+                <p style={{ color: settings.uiSettings.colors.primary }}>
+                  Sample text in primary color
+                </p>
               </div>
             </div>
           </div>

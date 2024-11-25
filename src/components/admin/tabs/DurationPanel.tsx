@@ -1,9 +1,7 @@
-// components/admin/tabs/DurationPanel.tsx
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Clock } from "lucide-react";
 import type { FormattedBusiness } from '@/types/business';
 
 interface DurationPanelProps {
@@ -11,56 +9,55 @@ interface DurationPanelProps {
   updateDuration: (field: 'minDuration' | 'maxDuration' | 'interval', value: number) => void;
 }
 
-export function DurationPanel({
+export default function DurationPanel({
   settings,
-  updateDuration,
+  updateDuration
 }: DurationPanelProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="w-5 h-5" />
-          Duration Settings
-        </CardTitle>
+        <CardTitle>Duration Settings</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <Label>Minimum Duration (minutes)</Label>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="minDuration">Minimum Duration (minutes)</Label>
             <Input
+              id="minDuration"
               type="number"
+              min="0"
+              step="15"
               value={settings.durationConfig.minDuration}
-              onChange={(e) => updateDuration('minDuration', Number(e.target.value))}
-              className="mt-1"
+              onChange={(e) => updateDuration('minDuration', parseInt(e.target.value))}
             />
-            <p className="text-sm text-gray-500 mt-1">
-              Shortest booking duration allowed
-            </p>
           </div>
-          <div>
-            <Label>Maximum Duration (minutes)</Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="maxDuration">Maximum Duration (minutes)</Label>
             <Input
+              id="maxDuration"
               type="number"
+              min="0"
+              step="15"
               value={settings.durationConfig.maxDuration}
-              onChange={(e) => updateDuration('maxDuration', Number(e.target.value))}
-              className="mt-1"
+              onChange={(e) => updateDuration('maxDuration', parseInt(e.target.value))}
             />
-            <p className="text-sm text-gray-500 mt-1">
-              Longest booking duration allowed
-            </p>
           </div>
-          <div>
-            <Label>Time Interval (minutes)</Label>
-            <Input
-              type="number"
-              value={settings.durationConfig.interval}
-              onChange={(e) => updateDuration('interval', Number(e.target.value))}
-              className="mt-1"
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Duration steps (e.g., 15, 30, 45 minutes)
-            </p>
-          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="interval">Time Slot Interval (minutes)</Label>
+          <Input
+            id="interval"
+            type="number"
+            min="5"
+            step="5"
+            value={settings.durationConfig.interval}
+            onChange={(e) => updateDuration('interval', parseInt(e.target.value))}
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            This determines the spacing between available time slots
+          </p>
         </div>
       </CardContent>
     </Card>

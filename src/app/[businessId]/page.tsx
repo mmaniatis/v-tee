@@ -13,7 +13,6 @@ import { formatTime, generateTimeSlots, isTimeSlotAvailable, getDaySchedule, DAY
 import { isPeakTime, calculatePrice } from '@/utils/pricingUtils';
 import { generateDurationOptions } from '@/utils/durationUtils';
 import { getBusiness, getReservationsForDay, createReservation } from '@/lib/db';
-import { Toast } from '@/components/ui/toast';
 import type { FormattedBusiness, DaySchedule } from '@/types/business';
 import type { Reservation } from '@prisma/client';
 import { fetchBusiness, fetchReservationsForDay, createNewReservation } from '@/utils/api';
@@ -108,7 +107,10 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     async function loadReservations() {
       try {
         const dateStr = bookingState.date.toISOString().split('T')[0];
+        console.log("operation=loadReservations business=" + business)
         const reservations = await fetchReservationsForDay(business.id, dateStr);
+        console.log("operation=loadReservations reservations=" + reservations)
+
         setDayReservations(reservations);
       } catch (err) {
         console.error('Failed to load reservations:', err);
@@ -118,7 +120,6 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     loadReservations();
   }, [business, bookingState.date]);
 
-  // Update time slots when date, reservations, or duration changes
   useEffect(() => {
     if (!business) return;
 
@@ -134,19 +135,12 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
       business.durationConfig.interval
     ).map(slot => ({
       ...slot,
-      isAvailable: bookingState.duration
-        ? isTimeSlotAvailable(
-            slot.value,
-            bookingState.date,
-            dayReservations,
-            parseInt(bookingState.duration)
-          )
-        : true,
+      isAvailable: isTimeSlotAvailable(slot.value, bookingState.date, dayReservations),
       isPeak: isPeakTime(slot.value, bookingState.date, business)
     }));
 
     setTimeSlots(slots);
-  }, [business, bookingState.date, bookingState.duration, dayReservations]);
+  }, [business, bookingState.date, dayReservations]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
@@ -200,13 +194,6 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
         bookingState.price
       );
 
-      Toast({
-        title: "Booking Confirmed",
-        description: `Your booking for ${bookingState.date.toLocaleDateString()} at ${
-          formatTime(bookingState.time)
-        } has been confirmed.`
-      });
-
       // Reset booking state and refresh reservations
       setBookingState(generateInitialBookingState());
       const updatedReservations = await fetchReservationsForDay(
@@ -214,12 +201,10 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
         bookingState.date.toISOString().split('T')[0]
       );
       setDayReservations(updatedReservations);
+
+      console.log("booking success!")
     } catch (error) {
-      Toast({
-        title: "Booking Failed",
-        description: "Unable to complete your booking. Please try again.",
-        variant: "destructive"
-      });
+      console.error(error)
     } finally {
       setBooking(false);
     }
@@ -264,7 +249,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             <Card>
               <CardContent className="p-6">
                 <p className="text-center text-gray-500">
-                  Sorry, we're closed on {DAYS[bookingState.date.getDay()]}s. 
+                  Sorry, we're closed on {DAYS[bookingState.date.getDay()]}s.
                   Please select another date.
                 </p>
               </CardContent>
@@ -315,30 +300,41 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-3 gap-2">
-                      {timeSlots.map((slot) => (
-                        <Button
-                          key={slot.value}
-                          onClick={() => slot.isAvailable && handleTimeSelect(slot.value)}
-                          className={`w-full h-16 relative transition-colors ${
-                            !slot.isAvailable ? 'cursor-not-allowed opacity-50' : ''
-                          }`}
-                          style={getTimeSlotStyle(
-                            slot,
-                            bookingState.time,
-                            business.uiSettings.colors
-                          )}
-                          disabled={!slot.isAvailable}
-                        >
-                          {slot.display}
-                          {business.pricing.peakHourPricingEnabled && 
-                           daySchedule.peakHoursEnabled && 
-                           slot.isPeak && (
-                            <span className="absolute top-1 right-1 text-xs text-green-600">
-                              Peak
-                            </span>
-                          )}
-                        </Button>
-                      ))}
+                      {timeSlots
+                        .filter(slot => slot.isAvailable)
+                        .map((slot) => (
+                          <Button
+                            key={slot.value}
+                            onClick={() => handleTimeSelect(slot.value)}
+                            className="w-full h-16 relative transition-colors hover:opacity-80"
+                            style={{
+                              backgroundColor: bookingState.time === slot.value
+                                ? business.uiSettings.colors.primary
+                                : business.uiSettings.colors.secondary,
+                              color: bookingState.time === slot.value
+                                ? business.uiSettings.colors.secondary
+                                : business.uiSettings.colors.primary,
+                              border: `1px solid ${business.uiSettings.colors.primary}`
+                            }}
+                          >
+                            {slot.display}
+                            {business.pricing.peakHourPricingEnabled &&
+                              daySchedule.peakHoursEnabled &&
+                              slot.isPeak && (
+                                <span className="absolute top-1 right-1 text-xs text-green-600">
+                                  $$
+                                </span>
+                              )}
+
+                            {business.pricing.peakHourPricingEnabled &&
+                              daySchedule.peakHoursEnabled &&
+                              !slot.isPeak && (
+                                <span className="absolute top-1 right-1 text-xs text-green-600">
+                                  $
+                                </span>
+                              )}
+                          </Button>
+                        ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -354,7 +350,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                         value={bookingState.duration || ""}
                         onValueChange={handleDurationSelect}
                       >
-                        <SelectTrigger 
+                        <SelectTrigger
                           className="w-full"
                           style={{ borderColor: business.uiSettings.colors.primary }}
                         >
@@ -362,8 +358,8 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                         </SelectTrigger>
                         <SelectContent>
                           {durationOptions.map((option) => (
-                            <SelectItem 
-                              key={option.value} 
+                            <SelectItem
+                              key={option.value}
                               value={option.value}
                             >
                               {option.label}
@@ -384,7 +380,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 
+                    <h3
                       className="text-lg font-semibold"
                       style={{ color: business.uiSettings.colors.secondary }}
                     >
@@ -399,8 +395,8 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     <p className="text-gray-500">
                       Price: {formatPrice(bookingState.price)}
                       {isPeakTime(bookingState.time, bookingState.date, business) && (
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className="ml-2 text-green-600 border-green-600"
                         >
                           Peak Hour Pricing

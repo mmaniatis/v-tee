@@ -1,4 +1,5 @@
 import type { DaySchedule } from '@/types/business';
+import type { Reservation } from '@prisma/client';
 
 export const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
@@ -24,6 +25,7 @@ export function generateTimeSlots(openTime: string, closeTime: string, interval:
     current = new Date(current.getTime() + interval * 60000);
   }
 
+  console.log("current time slots: " + slots)
   return slots;
 }
 
@@ -31,23 +33,31 @@ export function getDaySchedule(daySchedules: DaySchedule[], date: Date): DaySche
   const dayOfWeek = DAYS[date.getDay()];
   return daySchedules.find(schedule => schedule.dayOfWeek === dayOfWeek);
 }
-
 export function isTimeSlotAvailable(
   time: string,
   date: Date,
-  reservations: Array<{ startTime: string; duration: number }>,
-  durationMinutes: number
+  reservations: Reservation[]
 ): boolean {
-  const timeValue = new Date(`2000-01-01T${time}`).getTime();
-  const endTimeValue = timeValue + durationMinutes * 60000;
+  const dateStr = date.toISOString().split('T')[0];
+  const timeInMinutes = timeToMinutes(time);
 
   return !reservations.some(reservation => {
-    const reservationStart = new Date(`2000-01-01T${reservation.startTime}`).getTime();
-    const reservationEnd = reservationStart + reservation.duration * 60000;
-    return (
-      (timeValue >= reservationStart && timeValue < reservationEnd) ||
-      (endTimeValue > reservationStart && endTimeValue <= reservationEnd) ||
-      (timeValue <= reservationStart && endTimeValue >= reservationEnd)
-    );
+    if (reservation.date !== dateStr) return false;
+    
+    const reservationStartMinutes = timeToMinutes(reservation.startTime);
+    const reservationEndMinutes = reservationStartMinutes + Number(reservation.duration);
+
+    return timeInMinutes >= reservationStartMinutes && timeInMinutes < reservationEndMinutes;
   });
+}
+
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 }

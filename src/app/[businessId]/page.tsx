@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { formatTime, generateTimeSlots, isTimeSlotAvailable, getDaySchedule, DAYS } from '@/utils/timeUtils';
 import { isPeakTime, calculatePrice } from '@/utils/pricingUtils';
 import { generateDurationOptions } from '@/utils/durationUtils';
-import { getBusiness, getReservationsForDay, createReservation } from '@/lib/db';
 import type { FormattedBusiness, DaySchedule } from '@/types/business';
 import type { Reservation } from '@prisma/client';
 import { fetchBusiness, fetchReservationsForDay, createNewReservation } from '@/utils/api';
@@ -394,14 +393,7 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     </p>
                     <p className="text-gray-500">
                       Price: {formatPrice(bookingState.price)}
-                      {isPeakTime(bookingState.time, bookingState.date, business) && (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 text-green-600 border-green-600"
-                        >
-                          Peak Hour Pricing
-                        </Badge>
-                      )}
+                      {isPeakTime(bookingState.time, bookingState.date, business) ? ' (Peak Hour Pricing)' : ''}
                     </p>
                   </div>
                   <Button

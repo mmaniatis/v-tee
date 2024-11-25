@@ -1,3 +1,4 @@
+// pages/booking/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -7,37 +8,92 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { formatTime, generateTimeSlots, isTimeSlotAvailable, getHoursForDate, DAYS } from '@/utils/timeUtils';
+import { Badge } from "@/components/ui/badge";
+import { formatTime, generateTimeSlots, isTimeSlotAvailable, getDaySchedule, DAYS } from '@/utils/timeUtils';
 import { isPeakTime, calculatePrice } from '@/utils/pricingUtils';
-import { getButtonStyles } from '@/utils/uiUtils';
 import { generateDurationOptions } from '@/utils/durationUtils';
-import { fetchBusiness, createReservation, fetchReservations } from '@/utils/api';
-import type { FormattedBusiness } from '@/types/business';
+import { getBusiness, getReservationsForDay, createReservation } from '@/lib/db';
+import { Toast } from '@/components/ui/toast';
+import type { FormattedBusiness, DaySchedule } from '@/types/business';
 import type { Reservation } from '@prisma/client';
+import { fetchBusiness, fetchReservationsForDay, createNewReservation } from '@/utils/api';
+
+interface BookingState {
+  date: Date;
+  time: string | null;
+  duration: string | null;
+  price: number | null;
+}
+
+interface TimeSlot {
+  value: string;
+  display: string;
+  isAvailable: boolean;
+  isPeak: boolean;
+}
+
+function generateInitialBookingState(): BookingState {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return {
+    date: today,
+    time: null,
+    duration: null,
+    price: null
+  };
+}
+
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(price);
+}
+
+function getTimeSlotStyle(
+  slot: TimeSlot,
+  selectedTime: string | null,
+  colors: { primary: string; secondary: string }
+): React.CSSProperties {
+  if (!slot.isAvailable) {
+    return {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+      backgroundColor: '#f3f4f6'
+    };
+  }
+
+  if (selectedTime === slot.value) {
+    return {
+      backgroundColor: colors.primary,
+      color: 'white'
+    };
+  }
+
+  return {
+    borderColor: colors.primary,
+    color: colors.primary
+  };
+}
 
 export default function BookingPage({ params }: { params: Promise<{ businessId: string }> }) {
   const resolvedParams = React.use(params);
   const [business, setBusiness] = useState<FormattedBusiness | null>(null);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
-  const [totalPrice, setTotalPrice] = useState<number | null>(null);
+  const [bookingState, setBookingState] = useState<BookingState>(generateInitialBookingState());
+  const [dayReservations, setDayReservations] = useState<Reservation[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load business data
   useEffect(() => {
     async function loadBusiness() {
       try {
-        const businessData = await fetchBusiness(resolvedParams.businessId);
+        const businessData = await fetchBusiness(Number(resolvedParams.businessId));
         setBusiness(businessData);
-        setError(null);
-      } catch (error) {
-        console.error('Error loading business:', error);
-        setError('Failed to load business data. Please try again.');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load business');
       } finally {
         setLoading(false);
       }
@@ -45,103 +101,153 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
     loadBusiness();
   }, [resolvedParams.businessId]);
 
-  // Load reservations when date changes
+  // Updated useEffect for loading reservations
   useEffect(() => {
+    if (!business) return;
+
     async function loadReservations() {
-      if (!business) return;
-      
       try {
-        const date = selectedDate.toISOString().split('T')[0];
-        const reservationData = await fetchReservations(business.id.toString(), date);
-        setReservations(reservationData);
-      } catch (error) {
-        console.error('Error loading reservations:', error);
-        setError('Failed to load availability');
+        const dateStr = bookingState.date.toISOString().split('T')[0];
+        const reservations = await fetchReservationsForDay(business.id, dateStr);
+        setDayReservations(reservations);
+      } catch (err) {
+        console.error('Failed to load reservations:', err);
       }
     }
 
     loadReservations();
-  }, [business, selectedDate]);
+  }, [business, bookingState.date]);
 
-  if (loading) return <LoadingSpinner />;
-  if (!business) return <div className="p-4">Business not found</div>;
+  // Update time slots when date, reservations, or duration changes
+  useEffect(() => {
+    if (!business) return;
 
-  const availableTimeSlots = generateTimeSlots(
-    getHoursForDate(selectedDate, business).open,
-    getHoursForDate(selectedDate, business).close
-  ).filter(slot => 
-    isTimeSlotAvailable(
-      slot.value,
-      reservations,
-      selectedDuration ? parseInt(selectedDuration) : 30
-    )
-  );
-
-  const handleTimeSelect = (time: string) => {
-    setSelectedTime(time);
-    setSelectedDuration(null);
-    setTotalPrice(null);
-    setBookingSuccess(false);
-    setError(null);
-  };
-
-  const handleDurationSelect = (duration: string) => {
-    setSelectedDuration(duration);
-    setBookingSuccess(false);
-    setError(null);
-    if (selectedTime) {
-      setTotalPrice(calculatePrice(selectedTime, duration, selectedDate, business));
+    const daySchedule = getDaySchedule(business.daySchedules, bookingState.date);
+    if (!daySchedule || !daySchedule.isOpen) {
+      setTimeSlots([]);
+      return;
     }
-  };
+
+    const slots = generateTimeSlots(
+      daySchedule.openTime,
+      daySchedule.closeTime,
+      business.durationConfig.interval
+    ).map(slot => ({
+      ...slot,
+      isAvailable: bookingState.duration
+        ? isTimeSlotAvailable(
+            slot.value,
+            bookingState.date,
+            dayReservations,
+            parseInt(bookingState.duration)
+          )
+        : true,
+      isPeak: isPeakTime(slot.value, bookingState.date, business)
+    }));
+
+    setTimeSlots(slots);
+  }, [business, bookingState.date, bookingState.duration, dayReservations]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
-    setSelectedDate(date);
-    setSelectedTime(null);
-    setSelectedDuration(null);
-    setTotalPrice(null);
-    setBookingSuccess(false);
-    setError(null);
+    setBookingState(prev => ({
+      ...prev,
+      date,
+      time: null,
+      duration: null,
+      price: null
+    }));
+  };
+
+  const handleTimeSelect = (time: string) => {
+    setBookingState(prev => ({
+      ...prev,
+      time,
+      duration: null,
+      price: null
+    }));
+  };
+
+  const handleDurationSelect = (duration: string) => {
+    if (!business || !bookingState.time) return;
+
+    const price = calculatePrice(
+      bookingState.time,
+      parseInt(duration),
+      bookingState.date,
+      business
+    );
+
+    setBookingState(prev => ({
+      ...prev,
+      duration,
+      price
+    }));
   };
 
   const handleBooking = async () => {
-    if (!selectedTime || !selectedDuration || totalPrice === null) return;
+    if (!business || !bookingState.time || !bookingState.duration || !bookingState.price) {
+      return;
+    }
 
     setBooking(true);
-    setError(null);
     try {
-      const reservation = await createReservation({
-        businessId: business.id.toString(),
-        date: selectedDate.toISOString().split('T')[0],
-        startTime: selectedTime,
-        duration: parseFloat(selectedDuration),
-        price: totalPrice
+      const reservation = await createNewReservation(
+        business.id,
+        bookingState.date.toISOString().split('T')[0],
+        bookingState.time,
+        parseFloat(bookingState.duration),
+        bookingState.price
+      );
+
+      Toast({
+        title: "Booking Confirmed",
+        description: `Your booking for ${bookingState.date.toLocaleDateString()} at ${
+          formatTime(bookingState.time)
+        } has been confirmed.`
       });
 
-      if (reservation) {
-        setBookingSuccess(true);
-        // Reload reservations to update availability
-        const date = selectedDate.toISOString().split('T')[0];
-        const reservationData = await fetchReservations(business.id.toString(), date);
-        setReservations(reservationData);
-        // Reset form
-        setSelectedTime(null);
-        setSelectedDuration(null);
-        setTotalPrice(null);
-      }
+      // Reset booking state and refresh reservations
+      setBookingState(generateInitialBookingState());
+      const updatedReservations = await fetchReservationsForDay(
+        business.id,
+        bookingState.date.toISOString().split('T')[0]
+      );
+      setDayReservations(updatedReservations);
     } catch (error) {
-      setError('Unable to complete your booking. Please try again.');
-      setBookingSuccess(false);
+      Toast({
+        title: "Booking Failed",
+        description: "Unable to complete your booking. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setBooking(false);
     }
   };
+  if (loading) return <LoadingSpinner />;
+  if (error) return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-center text-red-500">{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+  if (!business) return null;
+
+  // Continuing from the previous code...
+
+  const daySchedule = getDaySchedule(business.daySchedules, bookingState.date);
+  const durationOptions = generateDurationOptions(business.durationConfig);
 
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4">
-          {/* Header Card */}
+          {/* Header */}
           <Card className="mb-8">
             <CardHeader>
               <CardTitle style={{ color: business.uiSettings.colors.primary }}>
@@ -154,123 +260,126 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             </CardHeader>
           </Card>
 
-          {bookingSuccess && (
-            <div className="mb-8 p-4 bg-green-100 text-green-700 rounded-md">
-              Booking confirmed for {selectedDate.toLocaleDateString()}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-8 p-4 bg-red-100 text-red-700 rounded-md">
-              {error}
-            </div>
-          )}
-
-          {/* Booking Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Calendar Card */}
+          {!daySchedule?.isOpen ? (
             <Card>
-              <CardHeader>
-                <CardTitle style={{ color: business.uiSettings.colors.secondary }}>
-                  Select Date
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  className="rounded-md border"
-                  disabled={[
-                    { before: new Date() }, // Disable past dates
-                    (date) => {
-                      const day = DAYS[date.getDay()].toLowerCase();
-                      return !business.weeklySchedule[day as keyof typeof business.weeklySchedule].isOpen;
-                    }
-                  ]}
-                />
+              <CardContent className="p-6">
+                <p className="text-center text-gray-500">
+                  Sorry, we're closed on {DAYS[bookingState.date.getDay()]}s. 
+                  Please select another date.
+                </p>
               </CardContent>
             </Card>
-
-            {/* Time Selection */}
-            <div className="space-y-6">
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Calendar Selection */}
               <Card>
                 <CardHeader>
                   <CardTitle style={{ color: business.uiSettings.colors.secondary }}>
-                    Available Times
+                    Select Date
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {availableTimeSlots.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {availableTimeSlots.map((slot) => {
-                        const isPeak = isPeakTime(slot.value, selectedDate, business);
-                        const showPricing = business.weeklySchedule[
-                          DAYS[selectedDate.getDay()].toLowerCase() as keyof typeof business.weeklySchedule
-                        ].peakHoursEnabled;
-
-                        return (
-                          <Button
-                            key={slot.value}
-                            onClick={() => handleTimeSelect(slot.value)}
-                            className={`w-full h-16 relative transition-colors ${
-                              selectedTime === slot.value ? 'ring-2 ring-offset-2' : ''
-                            }`}
-                            style={getButtonStyles(
-                              selectedTime === slot.value,
-                              business.uiSettings.colors.primary
-                            )}
-                          >
-                            {slot.display}
-                            {showPricing && (
-                              <span className={`absolute top-1 right-1 text-xs ${
-                                isPeak ? 'text-green-600' : 'text-green-500'
-                              }`}>
-                                {isPeak ? '$$' : '$'}
-                              </span>
-                            )}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      No available time slots for this date. Please try another date.
-                    </div>
-                  )}
+                  <Calendar
+                    mode="single"
+                    selected={bookingState.date}
+                    onSelect={handleDateSelect}
+                    className="rounded-md border"
+                    disabled={(date) => {
+                      const schedule = getDaySchedule(business.daySchedules, date);
+                      return !schedule?.isOpen || date < new Date();
+                    }}
+                    styles={{
+                      selected: {
+                        backgroundColor: business.uiSettings.colors.primary
+                      }
+                    }}
+                  />
                 </CardContent>
               </Card>
 
-              {/* Duration Selection */}
-              {selectedTime && (
+              {/* Time and Duration Selection */}
+              <div className="space-y-6">
+                {/* Time Slots */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Select Duration</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle style={{ color: business.uiSettings.colors.secondary }}>
+                      Available Times
+                    </CardTitle>
+                    {business.pricing.peakHourPricingEnabled && daySchedule.peakHoursEnabled && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-green-600 border-green-600">
+                          Peak Hours: {formatTime(business.pricing.peakHourStart)} - {formatTime(business.pricing.peakHourEnd)}
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
-                    <Select
-                      value={selectedDuration || ""}
-                      onValueChange={handleDurationSelect}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select duration" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {generateDurationOptions(business.durationConfig).map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="grid grid-cols-3 gap-2">
+                      {timeSlots.map((slot) => (
+                        <Button
+                          key={slot.value}
+                          onClick={() => slot.isAvailable && handleTimeSelect(slot.value)}
+                          className={`w-full h-16 relative transition-colors ${
+                            !slot.isAvailable ? 'cursor-not-allowed opacity-50' : ''
+                          }`}
+                          style={getTimeSlotStyle(
+                            slot,
+                            bookingState.time,
+                            business.uiSettings.colors
+                          )}
+                          disabled={!slot.isAvailable}
+                        >
+                          {slot.display}
+                          {business.pricing.peakHourPricingEnabled && 
+                           daySchedule.peakHoursEnabled && 
+                           slot.isPeak && (
+                            <span className="absolute top-1 right-1 text-xs text-green-600">
+                              Peak
+                            </span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
-              )}
+
+                {/* Duration Selection */}
+                {bookingState.time && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Select Duration</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Select
+                        value={bookingState.duration || ""}
+                        onValueChange={handleDurationSelect}
+                      >
+                        <SelectTrigger 
+                          className="w-full"
+                          style={{ borderColor: business.uiSettings.colors.primary }}
+                        >
+                          <SelectValue placeholder="Select duration" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {durationOptions.map((option) => (
+                            <SelectItem 
+                              key={option.value} 
+                              value={option.value}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Booking Summary */}
-          {selectedTime && selectedDuration && totalPrice !== null && (
+          {bookingState.time && bookingState.duration && bookingState.price !== null && (
             <Card className="mt-8">
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
@@ -282,14 +391,21 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                       Selected Booking
                     </h3>
                     <p className="text-gray-500">
-                      {selectedDate.toLocaleDateString()} at {formatTime(selectedTime)}
+                      {bookingState.date.toLocaleDateString()} at {formatTime(bookingState.time)}
                     </p>
                     <p className="text-gray-500">
-                      Duration: {generateDurationOptions(business.durationConfig)
-                        .find(opt => opt.value === selectedDuration)?.label}
+                      Duration: {durationOptions.find(opt => opt.value === bookingState.duration)?.label}
                     </p>
                     <p className="text-gray-500">
-                      Price: ${totalPrice.toFixed(2)}
+                      Price: {formatPrice(bookingState.price)}
+                      {isPeakTime(bookingState.time, bookingState.date, business) && (
+                        <Badge 
+                          variant="outline" 
+                          className="ml-2 text-green-600 border-green-600"
+                        >
+                          Peak Hour Pricing
+                        </Badge>
+                      )}
                     </p>
                   </div>
                   <Button

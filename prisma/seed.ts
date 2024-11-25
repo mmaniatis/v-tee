@@ -1,19 +1,7 @@
-// prisma/seed.ts
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Clear existing data
-  await prisma.pricing.deleteMany({});
-  await prisma.reservation.deleteMany({});
-  await prisma.durationConfig.deleteMany({});
-  await prisma.membership.deleteMany({});
-  await prisma.schedule.deleteMany({});
-  await prisma.weeklySchedule.deleteMany({});
-  await prisma.user.deleteMany({});
-  await prisma.role.deleteMany({});
-  await prisma.business.deleteMany({});
-
   // Create a single business
   const business = await prisma.business.create({
     data: {
@@ -23,7 +11,22 @@ async function main() {
     },
   });
 
-  // Create a single role
+  // Create day schedules
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  for (const day of days) {
+    await prisma.daySchedule.create({
+      data: {
+        businessId: business.id,
+        dayOfWeek: day,
+        isOpen: day !== 'sunday',
+        openTime: day === 'saturday' || day === 'sunday' ? '10:00' : '09:00',
+        closeTime: day === 'saturday' || day === 'sunday' ? '16:00' : '17:00',
+        peakHoursEnabled: day !== 'sunday' && day !== 'saturday',
+      },
+    });
+  }
+
+  // Create other related records (role, user, membership, etc.)
   const role = await prisma.role.create({
     data: {
       customer: true,
@@ -33,7 +36,6 @@ async function main() {
     },
   });
 
-  // Create a single user
   const user = await prisma.user.create({
     data: {
       businessId: business.id,
@@ -43,28 +45,6 @@ async function main() {
     },
   });
 
-  // Create a single weekly schedule
-  const weeklySchedule = await prisma.weeklySchedule.create({
-    data: {
-      weekdayOpen: '09:00',
-      weekdayClose: '17:00',
-      weekendOpen: '10:00',
-      weekendClose: '16:00',
-      daysClosed: ['Sunday'],
-      weekdayPeakHoursEnabled: true,
-      weekendPeakHoursEnabled: true,
-    },
-  });
-
-  // Create a single schedule
-  const schedule = await prisma.schedule.create({
-    data: {
-      businessId: business.id,
-      weeklyScheduleId: weeklySchedule.id,
-    },
-  });
-
-  // Create a single membership
   const membership = await prisma.membership.create({
     data: {
       businessId: business.id,
@@ -73,7 +53,6 @@ async function main() {
     },
   });
 
-  // Create a single duration config
   const durationConfig = await prisma.durationConfig.create({
     data: {
       businessId: business.id,
@@ -83,29 +62,26 @@ async function main() {
     },
   });
 
-  // Create pricing
   const pricing = await prisma.pricing.create({
     data: {
       businessId: business.id,
-      weekdayPrice: 50.0,
-      weekendPrice: 75.0,
+      weekdayPrice: 50,
+      weekendPrice: 75,
+      membershipDiscount: 0.1,
+      soloPricingDiscount: 0.05,
       peakHourPricingEnabled: true,
-      peakHourPriceAdditionalCost: 10.0,
-      soloPricingDiscount: 0.1,
-      membershipDiscount: 0.2,
+      peakHourStart: '09:00',
+      peakHourEnd: '17:00',
+      peakHourPriceAdditionalCost: 10,
     },
   });
 
-  console.log({
-    business: business.id,
-    pricing: pricing.id,
-    message: 'Seed data created successfully',
-  });
+  console.log('Test data generated successfully!');
 }
 
 main()
   .catch((e) => {
-    console.error('Error seeding database:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

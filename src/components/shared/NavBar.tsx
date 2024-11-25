@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { Home, LogIn, ExternalLink } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { getBusinessById } from "@/lib/mockData";
+// import { getBusinessById } from "@/lib/mockData";
 
 const Navbar = () => {
   const params = useParams();
   const pathname = usePathname();
   const businessId = params?.businessId;
   
-  const business = businessId ? getBusinessById(Number(businessId)) : null;
+  const business = null;
   const showLogin = businessId && pathname === `/${businessId}`;
   const homeLink = business ? `/${businessId}` : '/';
   const homeText = business ? business.name : 'Golf Sim Manager';

@@ -1,45 +1,11 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
+// schema.prisma
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           Int               @id @default(autoincrement())
-  business     Business         @relation(fields: [businessId], references: [id])
-  businessId   Int
-  isMember     Boolean           @default(false)
-  userRole     Role              @relation(fields: [userRoleId], references: [id], name: "UserToRole")
-  userRoleId   Int
-  username     String            @unique
-  email        String            @unique
-  transactions TransactionHistory[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-}
-
-model Role {
-  id        Int       @id @default(autoincrement())
-  users     User[]    @relation(name: "UserToRole")
-  customer  Boolean
-  employee  Boolean
-  supervisor Boolean
-  admin     Boolean
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model Membership {
-  id          Int       @id @default(autoincrement())
-  business    Business  @relation(fields: [businessId], references: [id])
-  businessId  Int       @unique
-  yearlyCost  Float
-  monthlyCost Float
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+generator client {
+  provider = "prisma-client-js"
 }
 
 model Business {
@@ -48,88 +14,99 @@ model Business {
   location       String
   description    String
   users          User[]
-  schedules      Schedule[]
+  daySchedules   DaySchedule[]
   membership     Membership?
   durationConfig DurationConfig?
   pricing        Pricing?
+  uiSettings     Json            @default("{\"colors\":{\"primary\":\"#4F46E5\",\"secondary\":\"#1F2937\",\"accent\":\"#10B981\"},\"branding\":{\"businessName\":\"\",\"displayName\":\"\",\"description\":\"\"}}")
   reservations   Reservation[]
-  transactions   TransactionHistory[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }
 
-model Schedule {
-  id                Int           @id @default(autoincrement())
-  business          Business      @relation(fields: [businessId], references: [id])
-  businessId        Int           @unique
-  weeklySchedule    WeeklySchedule @relation(fields: [weeklyScheduleId], references: [id])
-  weeklyScheduleId  Int           @unique
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+model DaySchedule {
+  id               Int      @id @default(autoincrement())
+  business         Business @relation(fields: [businessId], references: [id])
+  businessId       Int
+  dayOfWeek        String // monday, tuesday, etc.
+  isOpen           Boolean  @default(true)
+  openTime         String // 24h format HH:mm
+  closeTime        String // 24h format HH:mm
+  peakHoursEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([businessId, dayOfWeek])
 }
 
-model WeeklySchedule {
-  id                      Int       @id @default(autoincrement())
-  schedule                Schedule?
-  weekdayOpen             String
-  weekdayClose            String
-  weekendOpen             String
-  weekendClose            String
-  daysClosed              String[]
-  peakHoursStart          String?
-  peakHoursEnd            String?
-  weekdayPeakHoursEnabled Boolean   @default(false)
-  weekendPeakHoursEnabled Boolean   @default(false)
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+model User {
+  id         Int      @id @default(autoincrement())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId Int
+  userRole   Role     @relation(fields: [userRoleId], references: [id])
+  userRoleId Int
+  username   String   @unique
+  email      String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Role {
+  id         Int      @id @default(autoincrement())
+  customer   Boolean  @default(true)
+  employee   Boolean  @default(false)
+  supervisor Boolean  @default(false)
+  admin      Boolean  @default(false)
+  users      User[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Membership {
+  id          Int      @id @default(autoincrement())
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  Int      @unique
+  yearlyCost  Float
+  monthlyCost Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model DurationConfig {
-  id          Int       @id @default(autoincrement())
-  business    Business  @relation(fields: [businessId], references: [id])
-  businessId  Int       @unique
+  id          Int      @id @default(autoincrement())
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  Int      @unique
   minDuration Float
   maxDuration Float
   interval    Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Pricing {
-  id                       Int      @id @default(autoincrement())
-  business                 Business @relation(fields: [businessId], references: [id])
-  businessId               Int      @unique
-  weekdayPrice             Int
-  weekendPrice             Int
-  membershipDiscount       Float
-  soloPricingDiscount      Float
-  peakHourPricingEnabled   Boolean  @default(false)
-  peakHourPriceAdditionalCost Int
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                          Int      @id @default(autoincrement())
+  business                    Business @relation(fields: [businessId], references: [id])
+  businessId                  Int      @unique
+  weekdayPrice                Float
+  weekendPrice                Float
+  membershipDiscount          Float    @default(0)
+  soloPricingDiscount         Float    @default(0)
+  peakHourPricingEnabled      Boolean  @default(false)
+  peakHourStart               String   @default("09:00")
+  peakHourEnd                 String   @default("17:00")
+  peakHourPriceAdditionalCost Float    @default(0)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 }
 
 model Reservation {
-  id            Int               @id @default(autoincrement())
-  business      Business         @relation(fields: [businessId], references: [id])
-  businessId    Int
-  date          String
-  price         Float
-  startTime     String
-  duration      Float
-  transactions  TransactionHistory[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-}
-
-model TransactionHistory {
-  id            Int              @id @default(autoincrement())
-  business      Business         @relation(fields: [businessId], references: [id])
-  businessId    Int
-  user          User             @relation(fields: [userId], references: [id])
-  userId        Int
-  reservation   Reservation      @relation(fields: [reservationId], references: [id])
-  reservationId Int
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id         Int      @id @default(autoincrement())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId Int
+  date       String
+  startTime  String
+  duration   Float
+  price      Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

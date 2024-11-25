@@ -1,34 +1,41 @@
-// app/api/business/[businessId]/reservations/route.ts
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { getBusinessReservations, getReservationsForDay } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { businessId: string } }
 ) {
+  const businessId = await Promise.resolve(params.businessId);
+  if (!businessId) {
+    return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
+  }
+
+  const searchParams = request.nextUrl.searchParams;
+  const date = searchParams.get('date');
+  const startDate = searchParams.get('startDate');
+  const endDate = searchParams.get('endDate');
+
   try {
-    const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date');
-
-    if (!date) {
-      return NextResponse.json({ error: 'Date is required' }, { status: 400 });
+    let reservations;
+    if (date) {
+      reservations = await getReservationsForDay(Number(businessId), date);
+    } else {
+      reservations = await getBusinessReservations(
+        Number(businessId),
+        startDate || undefined,
+        endDate || undefined
+      );
     }
-
-    const reservations = await prisma.reservation.findMany({
-      where: {
-        businessId: parseInt(params.businessId),
-        date: date,
-      },
-      select: {
-        startTime: true,
-        duration: true,
-        date: true,
-      },
-    });
-
     return NextResponse.json(reservations);
   } catch (error) {
     console.error('Error fetching reservations:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch reservations' },
+      { status: 500 }
+    );
   }
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 200 });
 }

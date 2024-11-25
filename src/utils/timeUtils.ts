@@ -1,130 +1,53 @@
-// utils/timeUtils.ts
-import type { FormattedBusiness } from '@/types/business';
-import type { Reservation } from '@prisma/client';
+import type { DaySchedule } from '@/types/business';
 
-export const DAYS = [
-  'sunday',
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday'
-] as const;
+export const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
-export type DayOfWeek = typeof DAYS[number];
-
-export interface TimeSlot {
-  value: string;  // e.g., "09:00"
-  display: string; // e.g., "9:00 AM"
+export function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours, 10);
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const formattedHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${formattedHour}:${minutes} ${period}`;
 }
 
-export interface BusinessHours {
-  open: string;
-  close: string;
-}
+export function generateTimeSlots(openTime: string, closeTime: string, interval: number = 30): Array<{ value: string; display: string }> {
+  const slots: Array<{ value: string; display: string }> = [];
+  let current = new Date(`2000-01-01T${openTime}`);
+  const end = new Date(`2000-01-01T${closeTime}`);
 
-export function getHoursForDate(date: Date, business: FormattedBusiness): BusinessHours {
-  const dayOfWeek = DAYS[date.getDay()].toLowerCase() as DayOfWeek;
-  const daySchedule = business.weeklySchedule[dayOfWeek];
-  
-  return {
-    open: daySchedule.open,
-    close: daySchedule.close
-  };
-}
-
-export function generateTimeSlots(openTime: string, closeTime: string): TimeSlot[] {
-  const slots: TimeSlot[] = [];
-  let currentTime = new Date(`2000-01-01T${openTime}`);
-  const endTime = new Date(`2000-01-01T${closeTime}`);
-
-  while (currentTime < endTime) {
-    const timeString = currentTime.toTimeString().slice(0, 5);
+  while (current < end) {
+    const timeString = current.toTimeString().slice(0, 5);
     slots.push({
       value: timeString,
-      display: formatTime(timeString),
+      display: formatTime(timeString)
     });
-    currentTime.setMinutes(currentTime.getMinutes() + 30); // Assuming 30-minute intervals
+    current = new Date(current.getTime() + interval * 60000);
   }
 
   return slots;
 }
 
+export function getDaySchedule(daySchedules: DaySchedule[], date: Date): DaySchedule | undefined {
+  const dayOfWeek = DAYS[date.getDay()];
+  return daySchedules.find(schedule => schedule.dayOfWeek === dayOfWeek);
+}
+
 export function isTimeSlotAvailable(
-  timeSlot: string,
-  reservations: Reservation[],
-  duration: number = 30
+  time: string,
+  date: Date,
+  reservations: Array<{ startTime: string; duration: number }>,
+  durationMinutes: number
 ): boolean {
-  // Convert timeSlot to minutes since midnight for easier comparison
-  const slotStart = timeToMinutes(timeSlot);
-  const slotEnd = slotStart + duration;
+  const timeValue = new Date(`2000-01-01T${time}`).getTime();
+  const endTimeValue = timeValue + durationMinutes * 60000;
 
   return !reservations.some(reservation => {
-    const reservationStart = timeToMinutes(reservation.startTime);
-    const reservationEnd = reservationStart + reservation.duration;
-
-    // Check if there's any overlap
+    const reservationStart = new Date(`2000-01-01T${reservation.startTime}`).getTime();
+    const reservationEnd = reservationStart + reservation.duration * 60000;
     return (
-      (slotStart >= reservationStart && slotStart < reservationEnd) || // New slot starts during existing reservation
-      (slotEnd > reservationStart && slotEnd <= reservationEnd) || // New slot ends during existing reservation
-      (slotStart <= reservationStart && slotEnd >= reservationEnd) // New slot completely encompasses existing reservation
+      (timeValue >= reservationStart && timeValue < reservationEnd) ||
+      (endTimeValue > reservationStart && endTimeValue <= reservationEnd) ||
+      (timeValue <= reservationStart && endTimeValue >= reservationEnd)
     );
   });
-}
-
-export function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-export function formatTime(time: string): string {
-  const [hours, minutes] = time.split(':');
-  const hour = parseInt(hours, 10);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes} ${ampm}`;
-}
-
-// Helper function to check if a time is between two other times
-export function isTimeBetween(time: string, start: string, end: string): boolean {
-  const timeMinutes = timeToMinutes(time);
-  const startMinutes = timeToMinutes(start);
-  const endMinutes = timeToMinutes(end);
-  
-  return timeMinutes >= startMinutes && timeMinutes < endMinutes;
-}
-
-// Format a duration in minutes to a human-readable string
-export function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  
-  if (hours === 0) {
-    return `${minutes} minutes`;
-  } else if (remainingMinutes === 0) {
-    return `${hours} hour${hours > 1 ? 's' : ''}`;
-  } else {
-    return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minutes`;
-  }
-}
-
-// Get the next available time slot after a specific time
-export function getNextAvailableSlot(
-  time: string,
-  reservations: Reservation[],
-  interval: number = 30
-): string | null {
-  let currentTime = new Date(`2000-01-01T${time}`);
-  const endOfDay = new Date(`2000-01-01T23:59`);
-  
-  while (currentTime < endOfDay) {
-    const timeString = currentTime.toTimeString().slice(0, 5);
-    if (isTimeSlotAvailable(timeString, reservations)) {
-      return timeString;
-    }
-    currentTime.setMinutes(currentTime.getMinutes() + interval);
-  }
-  
-  return null;
 }

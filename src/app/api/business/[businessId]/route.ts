@@ -1,54 +1,72 @@
-// app/api/business/[businessId]/route.ts
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { formatBusiness } from '@/types/business';
+import { NextRequest, NextResponse } from 'next/server';
+import { getBusiness, updateBusiness } from '@/lib/db';
 
 export async function GET(
-  request: Request,
+  _request: NextRequest,
   { params }: { params: { businessId: string } }
 ) {
+  const businessId = await Promise.resolve(params.businessId);
+  console.log("businessId=" + businessId)
+  if (!businessId) {
+    return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
+  }
+
   try {
-    const id = Number(params.businessId);
-    if (isNaN(id)) {
-      return NextResponse.json({ error: 'Invalid business ID' }, { status: 400 });
-    }
-
-    const business = await prisma.business.findUnique({
-      where: { id },
-      include: {
-        membership: true,
-        schedules: {
-          include: {
-            weeklySchedule: true
-          }
-        },
-        durationConfig: true
-      }
-    });
-
+    const business = await getBusiness(Number(businessId));
     if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+      return NextResponse.json({ 
+        error: 'Business not found',
+        message: `No business found with ID ${businessId}`
+      }, { status: 404 });
     }
 
-    const pricing = await prisma.pricing.findFirst({
-      where: { businessId: id }
-    });
-
-    if (!pricing) {
-      return NextResponse.json({ error: 'Pricing not found' }, { status: 404 });
-    }
-
-    // Log the data before formatting
-    console.log('Business data:', JSON.stringify(business, null, 2));
-    console.log('Pricing data:', JSON.stringify(pricing, null, 2));
-
-    const formattedBusiness = formatBusiness(business, pricing);
-    return NextResponse.json(formattedBusiness);
+    return NextResponse.json(business);
   } catch (error) {
-    console.error('Error in business API route:', error);
+    console.error('Error fetching business:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Failed to fetch business details'
     }, { status: 500 });
   }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { businessId: string } }
+) {
+  if (!params.businessId) {
+    return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
+  }
+
+  try {
+    const body = await request.json();
+    const updated = await updateBusiness(Number(params.businessId), body);
+    
+    if (!updated) {
+      return NextResponse.json({ 
+        error: 'Update failed',
+        message: 'Failed to update business settings'
+      }, { status: 400 });
+    }
+
+    const business = await getBusiness(Number(params.businessId));
+    if (!business) {
+      return NextResponse.json({ 
+        error: 'Business not found',
+        message: 'Business was updated but could not be retrieved'
+      }, { status: 404 });
+    }
+
+    return NextResponse.json(business);
+  } catch (error) {
+    console.error('Error updating business:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      message: 'Failed to update business settings'
+    }, { status: 500 });
+  }
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({});
 }

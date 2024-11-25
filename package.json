@@ -9,10 +9,7 @@
     "lint": "next lint",
     "test": "npx jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "prisma": {
-      "seed": "ts-node prisma/seed.ts"
-    }
+    "test:coverage": "jest --coverage"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -32,7 +29,6 @@
     "date-fns": "^3.6.0",
     "lucide-react": "^0.456.0",
     "next": "15.0.3",
-    "prisma": "^5.22.0",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-colorful": "^5.6.1",
     "react-day-picker": "^8.10.1",
@@ -55,6 +51,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8",
+    "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",

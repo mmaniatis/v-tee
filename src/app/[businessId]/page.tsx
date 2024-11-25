@@ -244,6 +244,79 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
             </CardHeader>
           </Card>
 
+          {/* Duration Selection */}
+          {bookingState.time && (
+            <div className="">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Duration</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={bookingState.duration || ""}
+                    onValueChange={handleDurationSelect}
+                  >
+                    <SelectTrigger
+                      className="w-full"
+                      style={{ borderColor: business.uiSettings.colors.primary }}
+                    >
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {durationOptions.map((option) => (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          {/* Booking Summary */}
+          {bookingState.time && bookingState.duration && bookingState.price !== null && (
+            <div className="pt-4 py-4">
+              <Card className="">
+                <CardContent className="pt-0">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3
+                        className="text-lg font-semibold"
+                        style={{ color: business.uiSettings.colors.secondary }}
+                      >
+                        Selected Booking
+                      </h3>
+                      <p className="text-gray-500">
+                        {bookingState.date.toLocaleDateString()} at {formatTime(bookingState.time)}
+                      </p>
+                      <p className="text-gray-500">
+                        Duration: {durationOptions.find(opt => opt.value === bookingState.duration)?.label}
+                      </p>
+                      <p className="text-gray-500">
+                        Price: {formatPrice(bookingState.price)}
+                        {isPeakTime(bookingState.time, bookingState.date, business) ? ' (Peak Hour Pricing)' : ''}
+                      </p>
+                    </div>
+                    <Button
+                      className="transition-colors"
+                      style={{
+                        backgroundColor: business.uiSettings.colors.accent,
+                        color: 'white'
+                      }}
+                      onClick={handleBooking}
+                      disabled={booking}
+                    >
+                      {booking ? "Confirming..." : "Confirm Booking"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
           {!daySchedule?.isOpen ? (
             <Card>
               <CardContent className="p-6">
@@ -337,79 +410,8 @@ export default function BookingPage({ params }: { params: Promise<{ businessId: 
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Duration Selection */}
-                {bookingState.time && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Select Duration</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Select
-                        value={bookingState.duration || ""}
-                        onValueChange={handleDurationSelect}
-                      >
-                        <SelectTrigger
-                          className="w-full"
-                          style={{ borderColor: business.uiSettings.colors.primary }}
-                        >
-                          <SelectValue placeholder="Select duration" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {durationOptions.map((option) => (
-                            <SelectItem
-                              key={option.value}
-                              value={option.value}
-                            >
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             </div>
-          )}
-
-          {/* Booking Summary */}
-          {bookingState.time && bookingState.duration && bookingState.price !== null && (
-            <Card className="mt-8">
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3
-                      className="text-lg font-semibold"
-                      style={{ color: business.uiSettings.colors.secondary }}
-                    >
-                      Selected Booking
-                    </h3>
-                    <p className="text-gray-500">
-                      {bookingState.date.toLocaleDateString()} at {formatTime(bookingState.time)}
-                    </p>
-                    <p className="text-gray-500">
-                      Duration: {durationOptions.find(opt => opt.value === bookingState.duration)?.label}
-                    </p>
-                    <p className="text-gray-500">
-                      Price: {formatPrice(bookingState.price)}
-                      {isPeakTime(bookingState.time, bookingState.date, business) ? ' (Peak Hour Pricing)' : ''}
-                    </p>
-                  </div>
-                  <Button
-                    className="transition-colors"
-                    style={{
-                      backgroundColor: business.uiSettings.colors.accent,
-                      color: 'white'
-                    }}
-                    onClick={handleBooking}
-                    disabled={booking}
-                  >
-                    {booking ? "Confirming..." : "Confirm Booking"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           )}
         </div>
       </div>

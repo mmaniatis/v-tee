@@ -88,50 +88,92 @@ export const formatWeeklySchedule = (schedule: WeeklyScheduleWithRelations): For
   };
 };
 
-export const formatBusiness = (
-  business: BusinessWithRelations, 
-  pricing: PricingWithRelations
-): FormattedBusiness => {
+export function formatBusiness(business: any, pricing: any): FormattedBusiness {
+  // First, let's log the incoming data to debug
+  console.log('Raw business data:', JSON.stringify(business, null, 2));
+  console.log('Raw pricing data:', JSON.stringify(pricing, null, 2));
+
   return {
     id: business.id,
-    name: business.name,
-    location: business.location,
-    description: business.description,
-    weeklySchedule: formatWeeklySchedule(business.schedules[0].weeklySchedule),
+    weeklySchedule: {
+      monday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('monday'),
+        open: business.schedules[0].weeklySchedule.weekdayOpen,
+        close: business.schedules[0].weeklySchedule.weekdayClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekdayPeakHoursEnabled,
+      },
+      tuesday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('tuesday'),
+        open: business.schedules[0].weeklySchedule.weekdayOpen,
+        close: business.schedules[0].weeklySchedule.weekdayClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekdayPeakHoursEnabled,
+      },
+      wednesday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('wednesday'),
+        open: business.schedules[0].weeklySchedule.weekdayOpen,
+        close: business.schedules[0].weeklySchedule.weekdayClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekdayPeakHoursEnabled,
+      },
+      thursday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('thursday'),
+        open: business.schedules[0].weeklySchedule.weekdayOpen,
+        close: business.schedules[0].weeklySchedule.weekdayClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekdayPeakHoursEnabled,
+      },
+      friday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('friday'),
+        open: business.schedules[0].weeklySchedule.weekdayOpen,
+        close: business.schedules[0].weeklySchedule.weekdayClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekdayPeakHoursEnabled,
+      },
+      saturday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('saturday'),
+        open: business.schedules[0].weeklySchedule.weekendOpen,
+        close: business.schedules[0].weeklySchedule.weekendClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekendPeakHoursEnabled,
+      },
+      sunday: {
+        isOpen: !business.schedules[0].weeklySchedule.daysClosed.includes('sunday'),
+        open: business.schedules[0].weeklySchedule.weekendOpen,
+        close: business.schedules[0].weeklySchedule.weekendClose,
+        peakHoursEnabled: business.schedules[0].weeklySchedule.weekendPeakHoursEnabled,
+      },
+    },
+    durationConfig: {
+      minDuration: business.durationConfig.minDuration,
+      maxDuration: business.durationConfig.maxDuration,
+      interval: business.durationConfig.interval,
+    },
+    uiSettings: {
+      branding: {
+        businessName: business.name,
+        displayName: business.name,
+        description: business.description,
+      },
+      colors: {
+        primary: '#4F46E5',
+        secondary: '#2563EB',
+        accent: '#10B981',
+      },
+    },
     pricing: {
       weekday: pricing.weekdayPrice,
       weekend: pricing.weekendPrice,
       peakHours: {
         enabled: pricing.peakHourPricingEnabled,
-        start: business.schedules[0].weeklySchedule.peakHoursStart,
-        end: business.schedules[0].weeklySchedule.peakHoursEnd,
-        additionalCost: pricing.peakHourPriceAdditionalCost
+        start: '09:00',
+        end: '17:00',
+        additionalCost: pricing.peakHourPriceAdditionalCost,
       },
       solo: {
-        discount: pricing.soloPricingDiscount
+        enabled: true,
+        discount: pricing.soloPricingDiscount,
       },
       membership: {
         monthly: business.membership.monthlyCost,
         yearly: business.membership.yearlyCost,
-        perSessionDiscount: pricing.membershipDiscount
-      }
-    },
-    durationConfig: {
-      minDuration: business.durationConfig[0].minDuration,
-      maxDuration: business.durationConfig[0].maxDuration,
-      interval: business.durationConfig[0].interval
-    },
-    uiSettings: {
-      colors: {
-        primary: "#10B981",
-        secondary: "#1F2937",
-        accent: "#3B82F6"
+        perSessionDiscount: pricing.membershipDiscount,
       },
-      branding: {
-        businessName: business.name,
-        displayName: business.name,
-        description: business.description
-      }
-    }
+    },
   };
-};
+}

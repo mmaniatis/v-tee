@@ -2,7 +2,11 @@
 import { PrismaClient } from '@prisma/client';
 import { formatBusiness, type FormattedBusiness } from '@/types/business';
 
-const prisma = new PrismaClient();
+const globalForPrisma = global as unknown as { prisma: PrismaClient }
+
+export const prisma = globalForPrisma.prisma || new PrismaClient()
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
 export async function getBusiness(id: number): Promise<FormattedBusiness | null> {
   try {

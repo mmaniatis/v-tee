@@ -1,7 +1,19 @@
+// prisma/seed.ts
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
+  // Clear existing data
+  await prisma.pricing.deleteMany({});
+  await prisma.reservation.deleteMany({});
+  await prisma.durationConfig.deleteMany({});
+  await prisma.membership.deleteMany({});
+  await prisma.schedule.deleteMany({});
+  await prisma.weeklySchedule.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.role.deleteMany({});
+  await prisma.business.deleteMany({});
+
   // Create a single business
   const business = await prisma.business.create({
     data: {
@@ -39,6 +51,8 @@ async function main() {
       weekendOpen: '10:00',
       weekendClose: '16:00',
       daysClosed: ['Sunday'],
+      weekdayPeakHoursEnabled: true,
+      weekendPeakHoursEnabled: true,
     },
   });
 
@@ -69,25 +83,29 @@ async function main() {
     },
   });
 
-  // Create a single pricing
+  // Create pricing
   const pricing = await prisma.pricing.create({
     data: {
       businessId: business.id,
-      weekdayPrice: 50,
-      weekendPrice: 75,
-      membershipDiscount: 0.1,
-      soloPricingDiscount: 0.05,
+      weekdayPrice: 50.0,
+      weekendPrice: 75.0,
       peakHourPricingEnabled: true,
-      peakHourPriceAdditionalCost: 10,
+      peakHourPriceAdditionalCost: 10.0,
+      soloPricingDiscount: 0.1,
+      membershipDiscount: 0.2,
     },
   });
 
-  console.log('Test data generated successfully!');
+  console.log({
+    business: business.id,
+    pricing: pricing.id,
+    message: 'Seed data created successfully',
+  });
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('Error seeding database:', e);
     process.exit(1);
   })
   .finally(async () => {
